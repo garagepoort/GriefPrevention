@@ -1916,8 +1916,6 @@ public abstract class DataStore
         return resultNames;
     }
 
-    abstract void close();
-
     private class SavePlayerDataThread extends Thread
     {
         private final UUID playerID;

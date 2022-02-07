@@ -18,11 +18,14 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 
+import javax.sql.DataSource;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
@@ -69,8 +72,6 @@ public class DatabaseDataStore extends DataStore
     private static final String SQL_SELECT_SCHEMA_VERSION =
             "SELECT * FROM griefprevention_schemaversion";
 
-    private Connection databaseConnection = null;
-
     private final String databaseUrl;
     private final String userName;
     private final String password;
@@ -87,321 +88,316 @@ public class DatabaseDataStore extends DataStore
     @Override
     void initialize() throws Exception
     {
-        try
+        try (Connection connection = this.getDataConnection())
         {
-            this.refreshDataConnection();
+
+            try (Statement statement = connection.createStatement())
+            {
+                //ensure the data tables exist
+                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_nextclaimid (nextid INTEGER)");
+                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_claimdata (id INTEGER, owner VARCHAR(50), lessercorner VARCHAR(100), greatercorner VARCHAR(100), builders TEXT, containers TEXT, accessors TEXT, managers TEXT, inheritnothing BOOLEAN, parentid INTEGER)");
+                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_playerdata (name VARCHAR(50), lastlogin DATETIME, accruedblocks INTEGER, bonusblocks INTEGER)");
+                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_schemaversion (version INTEGER)");
+
+                // By making this run only for MySQL, we technically support SQLite too, as this is the only invalid
+                // SQL we use that SQLite does not support. Seeing as its only use is to update VERY old, existing, MySQL
+                // databases, this is of no concern.
+                if (databaseUrl.startsWith("jdbc:mysql://"))
+                {
+                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY builders TEXT");
+                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY containers TEXT");
+                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY accessors TEXT");
+                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY managers TEXT");
+                }
+
+                //if the next claim id table is empty, this is a brand new database which will write using the latest schema
+                //otherwise, schema version is determined by schemaversion table (or =0 if table is empty, see getSchemaVersion())
+                ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid");
+                if (!results.next())
+                {
+                    this.setSchemaVersion(latestSchemaVersion);
+                }
+            }
+            catch (Exception e3)
+            {
+                GriefPrevention.AddLogEntry("ERROR: Unable to create the necessary database table.  Details:");
+                GriefPrevention.AddLogEntry(e3.getMessage());
+                e3.printStackTrace();
+                throw e3;
+            }
+
+            //load group data into memory
+            Statement statement = connection.createStatement();
+            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
+
+            while (results.next())
+            {
+                String name = results.getString("name");
+
+                //ignore non-groups.  all group names start with a dollar sign.
+                if (!name.startsWith("$")) continue;
+
+                String groupName = name.substring(1);
+                if (groupName == null || groupName.isEmpty()) continue;  //defensive coding, avoid unlikely cases
+
+                int groupBonusBlocks = results.getInt("bonusblocks");
+
+                this.permissionToBonusBlocksMap.put(groupName, groupBonusBlocks);
+            }
+
+            //load next claim number into memory
+            results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid");
+
+            //if there's nothing yet, add it
+            if (!results.next())
+            {
+                statement.execute("INSERT INTO griefprevention_nextclaimid VALUES (0)");
+                this.nextClaimID = (long) 0;
+            }
+
+            //otherwise load it
+            else
+            {
+                this.nextClaimID = results.getLong("nextid");
+            }
+
+            if (this.getSchemaVersion() == 0)
+            {
+                try
+                {
+
+                    //pull ALL player data from the database
+                    statement = connection.createStatement();
+                    results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
+
+                    //make a list of changes to be made
+                    HashMap<String, UUID> changes = new HashMap<>();
+
+                    ArrayList<String> namesToConvert = new ArrayList<>();
+                    while (results.next())
+                    {
+                        //get the id
+                        String playerName = results.getString("name");
+
+                        //add to list of names to convert to UUID
+                        namesToConvert.add(playerName);
+                    }
+
+                    //resolve and cache as many as possible through various means
+                    try
+                    {
+                        UUIDFetcher fetcher = new UUIDFetcher(namesToConvert);
+                        fetcher.call();
+                    }
+                    catch (Exception e)
+                    {
+                        GriefPrevention.AddLogEntry("Failed to resolve a batch of names to UUIDs.  Details:" + e.getMessage());
+                        e.printStackTrace();
+                    }
+
+                    //reset results cursor
+                    results.beforeFirst();
+
+                    //for each result
+                    while (results.next())
+                    {
+                        //get the id
+                        String playerName = results.getString("name");
+
+                        //try to convert player name to UUID
+                        try
+                        {
+                            UUID playerID = UUIDFetcher.getUUIDOf(playerName);
+
+                            //if successful, update the playerdata row by replacing the player's name with the player's UUID
+                            if (playerID != null)
+                            {
+                                changes.put(playerName, playerID);
+                            }
+                        }
+                        //otherwise leave it as-is. no harm done - it won't be requested by name, and this update only happens once.
+                        catch (Exception ex) {}
+                    }
+
+                    for (String name : changes.keySet())
+                    {
+                        try (PreparedStatement updateStmnt = connection.prepareStatement(SQL_UPDATE_NAME))
+                        {
+                            updateStmnt.setString(1, changes.get(name).toString());
+                            updateStmnt.setString(2, name);
+                            updateStmnt.executeUpdate();
+                        }
+                        catch (SQLException e)
+                        {
+                            GriefPrevention.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
+                            GriefPrevention.AddLogEntry(e.getMessage());
+                        }
+                    }
+                }
+                catch (SQLException e)
+                {
+                    GriefPrevention.AddLogEntry("Unable to convert player data.  Details:");
+                    GriefPrevention.AddLogEntry(e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+
+            if (this.getSchemaVersion() <= 2)
+            {
+                statement = connection.createStatement();
+                statement.execute("ALTER TABLE griefprevention_claimdata ADD inheritNothing BOOLEAN DEFAULT 0 AFTER managers");
+            }
+
+            //load claims data into memory
+
+            results = statement.executeQuery("SELECT * FROM griefprevention_claimdata");
+
+            ArrayList<Claim> claimsToRemove = new ArrayList<>();
+            ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
+            List<World> validWorlds = Bukkit.getServer().getWorlds();
+
+            Long claimID = null;
+            while (results.next())
+            {
+                try
+                {
+                    //problematic claims will be removed from secondary storage, and never added to in-memory data store
+                    boolean removeClaim = false;
+
+                    long parentId = results.getLong("parentid");
+                    claimID = results.getLong("id");
+                    boolean inheritNothing = results.getBoolean("inheritNothing");
+                    Location lesserBoundaryCorner = null;
+                    Location greaterBoundaryCorner = null;
+                    String lesserCornerString = "(location not available)";
+                    try
+                    {
+                        lesserCornerString = results.getString("lessercorner");
+                        lesserBoundaryCorner = this.locationFromString(lesserCornerString, validWorlds);
+                        String greaterCornerString = results.getString("greatercorner");
+                        greaterBoundaryCorner = this.locationFromString(greaterCornerString, validWorlds);
+                    }
+                    catch (Exception e)
+                    {
+                        if (e.getMessage() != null && e.getMessage().contains("World not found"))
+                        {
+                            GriefPrevention.AddLogEntry("Failed to load a claim (ID:" + claimID.toString() + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
+                            continue;
+                        }
+                        else
+                        {
+                            throw e;
+                        }
+                    }
+
+                    String ownerName = results.getString("owner");
+                    UUID ownerID = null;
+                    if (ownerName.isEmpty() || ownerName.startsWith("--"))
+                    {
+                        ownerID = null;  //administrative land claim or subdivision
+                    }
+                    else if (this.getSchemaVersion() < 1)
+                    {
+                        try
+                        {
+                            ownerID = UUIDFetcher.getUUIDOf(ownerName);
+                        }
+                        catch (Exception ex)
+                        {
+                            GriefPrevention.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
+                            GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            ownerID = UUID.fromString(ownerName);
+                        }
+                        catch (Exception ex)
+                        {
+                            GriefPrevention.AddLogEntry("This owner entry is not a UUID: " + ownerName + ".");
+                            GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
+                        }
+                    }
+
+                    String buildersString = results.getString("builders");
+                    List<String> builderNames = Arrays.asList(buildersString.split(";"));
+                    builderNames = this.convertNameListToUUIDList(builderNames);
+
+                    String containersString = results.getString("containers");
+                    List<String> containerNames = Arrays.asList(containersString.split(";"));
+                    containerNames = this.convertNameListToUUIDList(containerNames);
+
+                    String accessorsString = results.getString("accessors");
+                    List<String> accessorNames = Arrays.asList(accessorsString.split(";"));
+                    accessorNames = this.convertNameListToUUIDList(accessorNames);
+
+                    String managersString = results.getString("managers");
+                    List<String> managerNames = Arrays.asList(managersString.split(";"));
+                    managerNames = this.convertNameListToUUIDList(managerNames);
+                    Claim claim = new Claim(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderNames, containerNames, accessorNames, managerNames, inheritNothing, claimID);
+
+                    if (removeClaim)
+                    {
+                        claimsToRemove.add(claim);
+                    }
+                    else if (parentId == -1)
+                    {
+                        //top level claim
+                        this.addClaim(claim, false);
+                    }
+                    else
+                    {
+                        //subdivision
+                        subdivisionsToLoad.add(claim);
+                    }
+                }
+                catch (SQLException e)
+                {
+                    GriefPrevention.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
+                    e.printStackTrace();
+                }
+            }
+
+            //add subdivisions to their parent claims
+            for (Claim childClaim : subdivisionsToLoad)
+            {
+                //find top level claim parent
+                Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), true, null);
+
+                if (topLevelClaim == null)
+                {
+                    claimsToRemove.add(childClaim);
+                    GriefPrevention.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
+                    continue;
+                }
+
+                //add this claim to the list of children of the current top level claim
+                childClaim.parent = topLevelClaim;
+                topLevelClaim.children.add(childClaim);
+                childClaim.inDataStore = true;
+            }
+
+            for (Claim claim : claimsToRemove)
+            {
+                this.deleteClaimFromSecondaryStorage(claim);
+            }
+
+            if (this.getSchemaVersion() <= 2)
+            {
+                statement = connection.createStatement();
+                statement.execute("DELETE FROM griefprevention_claimdata WHERE id = '-1'");
+            }
+
+            super.initialize();
+
         }
         catch (Exception e2)
         {
             GriefPrevention.AddLogEntry("ERROR: Unable to connect to database.  Check your config file settings.");
             throw e2;
         }
-
-        try (Statement statement = databaseConnection.createStatement())
-        {
-            //ensure the data tables exist
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_nextclaimid (nextid INTEGER)");
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_claimdata (id INTEGER, owner VARCHAR(50), lessercorner VARCHAR(100), greatercorner VARCHAR(100), builders TEXT, containers TEXT, accessors TEXT, managers TEXT, inheritnothing BOOLEAN, parentid INTEGER)");
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_playerdata (name VARCHAR(50), lastlogin DATETIME, accruedblocks INTEGER, bonusblocks INTEGER)");
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_schemaversion (version INTEGER)");
-
-            // By making this run only for MySQL, we technically support SQLite too, as this is the only invalid
-            // SQL we use that SQLite does not support. Seeing as its only use is to update VERY old, existing, MySQL
-            // databases, this is of no concern.
-            if (databaseUrl.startsWith("jdbc:mysql://"))
-            {
-                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY builders TEXT");
-                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY containers TEXT");
-                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY accessors TEXT");
-                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY managers TEXT");
-            }
-
-            //if the next claim id table is empty, this is a brand new database which will write using the latest schema
-            //otherwise, schema version is determined by schemaversion table (or =0 if table is empty, see getSchemaVersion())
-            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid");
-            if (!results.next())
-            {
-                this.setSchemaVersion(latestSchemaVersion);
-            }
-        }
-        catch (Exception e3)
-        {
-            GriefPrevention.AddLogEntry("ERROR: Unable to create the necessary database table.  Details:");
-            GriefPrevention.AddLogEntry(e3.getMessage());
-            e3.printStackTrace();
-            throw e3;
-        }
-
-        //load group data into memory
-        Statement statement = databaseConnection.createStatement();
-        ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
-
-        while (results.next())
-        {
-            String name = results.getString("name");
-
-            //ignore non-groups.  all group names start with a dollar sign.
-            if (!name.startsWith("$")) continue;
-
-            String groupName = name.substring(1);
-            if (groupName == null || groupName.isEmpty()) continue;  //defensive coding, avoid unlikely cases
-
-            int groupBonusBlocks = results.getInt("bonusblocks");
-
-            this.permissionToBonusBlocksMap.put(groupName, groupBonusBlocks);
-        }
-
-        //load next claim number into memory
-        results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid");
-
-        //if there's nothing yet, add it
-        if (!results.next())
-        {
-            statement.execute("INSERT INTO griefprevention_nextclaimid VALUES (0)");
-            this.nextClaimID = (long) 0;
-        }
-
-        //otherwise load it
-        else
-        {
-            this.nextClaimID = results.getLong("nextid");
-        }
-
-        if (this.getSchemaVersion() == 0)
-        {
-            try
-            {
-                this.refreshDataConnection();
-
-                //pull ALL player data from the database
-                statement = this.databaseConnection.createStatement();
-                results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
-
-                //make a list of changes to be made
-                HashMap<String, UUID> changes = new HashMap<>();
-
-                ArrayList<String> namesToConvert = new ArrayList<>();
-                while (results.next())
-                {
-                    //get the id
-                    String playerName = results.getString("name");
-
-                    //add to list of names to convert to UUID
-                    namesToConvert.add(playerName);
-                }
-
-                //resolve and cache as many as possible through various means
-                try
-                {
-                    UUIDFetcher fetcher = new UUIDFetcher(namesToConvert);
-                    fetcher.call();
-                }
-                catch (Exception e)
-                {
-                    GriefPrevention.AddLogEntry("Failed to resolve a batch of names to UUIDs.  Details:" + e.getMessage());
-                    e.printStackTrace();
-                }
-
-                //reset results cursor
-                results.beforeFirst();
-
-                //for each result
-                while (results.next())
-                {
-                    //get the id
-                    String playerName = results.getString("name");
-
-                    //try to convert player name to UUID
-                    try
-                    {
-                        UUID playerID = UUIDFetcher.getUUIDOf(playerName);
-
-                        //if successful, update the playerdata row by replacing the player's name with the player's UUID
-                        if (playerID != null)
-                        {
-                            changes.put(playerName, playerID);
-                        }
-                    }
-                    //otherwise leave it as-is. no harm done - it won't be requested by name, and this update only happens once.
-                    catch (Exception ex) { }
-                }
-
-                //refresh data connection in case data migration took a long time
-                this.refreshDataConnection();
-
-                for (String name : changes.keySet())
-                {
-                    try (PreparedStatement updateStmnt = this.databaseConnection.prepareStatement(SQL_UPDATE_NAME))
-                    {
-                        updateStmnt.setString(1, changes.get(name).toString());
-                        updateStmnt.setString(2, name);
-                        updateStmnt.executeUpdate();
-                    }
-                    catch (SQLException e)
-                    {
-                        GriefPrevention.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
-                        GriefPrevention.AddLogEntry(e.getMessage());
-                    }
-                }
-            }
-            catch (SQLException e)
-            {
-                GriefPrevention.AddLogEntry("Unable to convert player data.  Details:");
-                GriefPrevention.AddLogEntry(e.getMessage());
-                e.printStackTrace();
-            }
-        }
-
-        if (this.getSchemaVersion() <= 2)
-        {
-            statement = this.databaseConnection.createStatement();
-            statement.execute("ALTER TABLE griefprevention_claimdata ADD inheritNothing BOOLEAN DEFAULT 0 AFTER managers");
-        }
-
-        //load claims data into memory
-
-        results = statement.executeQuery("SELECT * FROM griefprevention_claimdata");
-
-        ArrayList<Claim> claimsToRemove = new ArrayList<>();
-        ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
-        List<World> validWorlds = Bukkit.getServer().getWorlds();
-
-        Long claimID = null;
-        while (results.next())
-        {
-            try
-            {
-                //problematic claims will be removed from secondary storage, and never added to in-memory data store
-                boolean removeClaim = false;
-
-                long parentId = results.getLong("parentid");
-                claimID = results.getLong("id");
-                boolean inheritNothing = results.getBoolean("inheritNothing");
-                Location lesserBoundaryCorner = null;
-                Location greaterBoundaryCorner = null;
-                String lesserCornerString = "(location not available)";
-                try
-                {
-                    lesserCornerString = results.getString("lessercorner");
-                    lesserBoundaryCorner = this.locationFromString(lesserCornerString, validWorlds);
-                    String greaterCornerString = results.getString("greatercorner");
-                    greaterBoundaryCorner = this.locationFromString(greaterCornerString, validWorlds);
-                }
-                catch (Exception e)
-                {
-                    if (e.getMessage() != null && e.getMessage().contains("World not found"))
-                    {
-                        GriefPrevention.AddLogEntry("Failed to load a claim (ID:" + claimID.toString() + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
-                        continue;
-                    }
-                    else
-                    {
-                        throw e;
-                    }
-                }
-
-                String ownerName = results.getString("owner");
-                UUID ownerID = null;
-                if (ownerName.isEmpty() || ownerName.startsWith("--"))
-                {
-                    ownerID = null;  //administrative land claim or subdivision
-                }
-                else if (this.getSchemaVersion() < 1)
-                {
-                    try
-                    {
-                        ownerID = UUIDFetcher.getUUIDOf(ownerName);
-                    }
-                    catch (Exception ex)
-                    {
-                        GriefPrevention.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
-                        GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
-                    }
-                }
-                else
-                {
-                    try
-                    {
-                        ownerID = UUID.fromString(ownerName);
-                    }
-                    catch (Exception ex)
-                    {
-                        GriefPrevention.AddLogEntry("This owner entry is not a UUID: " + ownerName + ".");
-                        GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
-                    }
-                }
-
-                String buildersString = results.getString("builders");
-                List<String> builderNames = Arrays.asList(buildersString.split(";"));
-                builderNames = this.convertNameListToUUIDList(builderNames);
-
-                String containersString = results.getString("containers");
-                List<String> containerNames = Arrays.asList(containersString.split(";"));
-                containerNames = this.convertNameListToUUIDList(containerNames);
-
-                String accessorsString = results.getString("accessors");
-                List<String> accessorNames = Arrays.asList(accessorsString.split(";"));
-                accessorNames = this.convertNameListToUUIDList(accessorNames);
-
-                String managersString = results.getString("managers");
-                List<String> managerNames = Arrays.asList(managersString.split(";"));
-                managerNames = this.convertNameListToUUIDList(managerNames);
-                Claim claim = new Claim(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderNames, containerNames, accessorNames, managerNames, inheritNothing, claimID);
-
-                if (removeClaim)
-                {
-                    claimsToRemove.add(claim);
-                }
-                else if (parentId == -1)
-                {
-                    //top level claim
-                    this.addClaim(claim, false);
-                }
-                else
-                {
-                    //subdivision
-                    subdivisionsToLoad.add(claim);
-                }
-            }
-            catch (SQLException e)
-            {
-                GriefPrevention.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
-                e.printStackTrace();
-            }
-        }
-
-        //add subdivisions to their parent claims
-        for (Claim childClaim : subdivisionsToLoad)
-        {
-            //find top level claim parent
-            Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), true, null);
-
-            if (topLevelClaim == null)
-            {
-                claimsToRemove.add(childClaim);
-                GriefPrevention.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
-                continue;
-            }
-
-            //add this claim to the list of children of the current top level claim
-            childClaim.parent = topLevelClaim;
-            topLevelClaim.children.add(childClaim);
-            childClaim.inDataStore = true;
-        }
-
-        for (Claim claim : claimsToRemove)
-        {
-            this.deleteClaimFromSecondaryStorage(claim);
-        }
-
-        if (this.getSchemaVersion() <= 2)
-        {
-            this.refreshDataConnection();
-            statement = this.databaseConnection.createStatement();
-            statement.execute("DELETE FROM griefprevention_claimdata WHERE id = '-1'");
-        }
-
-        super.initialize();
     }
 
     @Override
@@ -409,8 +405,6 @@ public class DatabaseDataStore extends DataStore
     {
         try
         {
-            this.refreshDataConnection();
-
             //wipe out any existing data about this claim
             this.deleteClaimFromSecondaryStorage(claim);
 
@@ -446,7 +440,7 @@ public class DatabaseDataStore extends DataStore
         boolean inheritNothing = claim.getSubclaimRestrictions();
         long parentId = claim.parent == null ? -1 : claim.parent.id;
 
-        try (PreparedStatement insertStmt = this.databaseConnection.prepareStatement(SQL_INSERT_CLAIM))
+        try (PreparedStatement insertStmt = this.getDataConnection().prepareStatement(SQL_INSERT_CLAIM))
         {
 
             insertStmt.setLong(1, claim.id);
@@ -472,7 +466,7 @@ public class DatabaseDataStore extends DataStore
     @Override
     synchronized void deleteClaimFromSecondaryStorage(Claim claim)
     {
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(SQL_DELETE_CLAIM))
+        try (PreparedStatement deleteStmnt = this.getDataConnection().prepareStatement(SQL_DELETE_CLAIM))
         {
             deleteStmnt.setLong(1, claim.id);
             deleteStmnt.executeUpdate();
@@ -491,7 +485,7 @@ public class DatabaseDataStore extends DataStore
         PlayerData playerData = new PlayerData();
         playerData.playerID = playerID;
 
-        try (PreparedStatement selectStmnt = this.databaseConnection.prepareStatement(SQL_SELECT_PLAYER_DATA))
+        try (PreparedStatement selectStmnt = this.getDataConnection().prepareStatement(SQL_SELECT_PLAYER_DATA))
         {
             selectStmnt.setString(1, playerID.toString());
             ResultSet results = selectStmnt.executeQuery();
@@ -525,8 +519,8 @@ public class DatabaseDataStore extends DataStore
 
     private void savePlayerData(String playerID, PlayerData playerData)
     {
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(SQL_DELETE_PLAYER_DATA);
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
+        try (Connection databaseConnection = getDataConnection(); PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_PLAYER_DATA);
+             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
         {
             OfflinePlayer player = Bukkit.getOfflinePlayer(UUID.fromString(playerID));
 
@@ -560,8 +554,9 @@ public class DatabaseDataStore extends DataStore
     {
         this.nextClaimID = nextID;
 
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(SQL_DELETE_NEXT_CLAIM_ID);
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(SQL_SET_NEXT_CLAIM_ID))
+        try (Connection databaseConnection = this.getDataConnection();
+             PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_NEXT_CLAIM_ID);
+             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_SET_NEXT_CLAIM_ID))
         {
             deleteStmnt.execute();
             insertStmnt.setLong(1, nextID);
@@ -579,8 +574,9 @@ public class DatabaseDataStore extends DataStore
     synchronized void saveGroupBonusBlocks(String groupName, int currentValue)
     {
         //group bonus blocks are stored in the player data table, with player name = $groupName
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(SQL_DELETE_GROUP_DATA);
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
+        try (Connection databaseConnection = this.getDataConnection();
+             PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_GROUP_DATA);
+             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
         {
             SimpleDateFormat sqlFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             String dateString = sqlFormat.format(new Date());
@@ -600,50 +596,45 @@ public class DatabaseDataStore extends DataStore
         }
     }
 
-    @Override
-    synchronized void close()
-    {
-        if (this.databaseConnection != null)
-        {
-            try
-            {
-                if (!this.databaseConnection.isClosed())
-                {
-                    this.databaseConnection.close();
-                }
-            }
-            catch (SQLException e) {}
-            ;
-        }
+    private HikariDataSource datasource;
 
-        this.databaseConnection = null;
+    public DataSource getDatasource() {
+        if (datasource == null) {
+            getDataSource();
+        }
+        return datasource;
     }
 
-    private synchronized void refreshDataConnection() throws SQLException
-    {
-        if (this.databaseConnection == null || !this.databaseConnection.isValid(3))
-        {
-            if (this.databaseConnection != null && !this.databaseConnection.isClosed())
-            {
-                this.databaseConnection.close();
-            }
+    public Connection getDataConnection() {
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            return getDatasource().getConnection();
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException("Failed to connect to the database", e);
+        }
+    }
 
-            //set username/pass properties
-            Properties connectionProps = new Properties();
-            connectionProps.put("user", this.userName);
-            connectionProps.put("password", this.password);
-            connectionProps.put("autoReconnect", "true");
-            connectionProps.put("maxReconnects", String.valueOf(Integer.MAX_VALUE));
-
-            //establish connection
-            this.databaseConnection = DriverManager.getConnection(this.databaseUrl, connectionProps);
+    private void getDataSource() {
+        if (datasource == null) {
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(this.databaseUrl);
+            config.setUsername(this.userName);
+            config.setPassword(password);
+            config.setMaximumPoolSize(5);
+            config.setLeakDetectionThreshold(5000);
+            config.setAutoCommit(true);
+            config.setDriverClassName("com.mysql.jdbc.Driver");
+            config.addDataSourceProperty("cachePrepStmts", "true");
+            config.addDataSourceProperty("prepStmtCacheSize", "250");
+            config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+            datasource = new HikariDataSource(config);
         }
     }
 
     @Override
     protected int getSchemaVersionFromStorage()
     {
-        try (PreparedStatement selectStmnt = this.databaseConnection.prepareStatement(SQL_SELECT_SCHEMA_VERSION))
+        try (PreparedStatement selectStmnt = this.getDataConnection().prepareStatement(SQL_SELECT_SCHEMA_VERSION))
         {
             ResultSet results = selectStmnt.executeQuery();
 
@@ -671,8 +662,9 @@ public class DatabaseDataStore extends DataStore
     @Override
     protected void updateSchemaVersionInStorage(int versionToSet)
     {
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(SQL_DELETE_SCHEMA_VERSION);
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(SQL_INSERT_SCHEMA_VERSION))
+        try (Connection databaseConnection = this.getDataConnection();
+             PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_SCHEMA_VERSION);
+             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_SCHEMA_VERSION))
         {
             deleteStmnt.execute();
 

@@ -870,9 +870,6 @@ public class FlatFileDataStore extends DataStore
     }
 
     @Override
-    synchronized void close() { }
-
-    @Override
     int getSchemaVersionFromStorage()
     {
         File schemaVersionFile = new File(schemaVersionFilePath);

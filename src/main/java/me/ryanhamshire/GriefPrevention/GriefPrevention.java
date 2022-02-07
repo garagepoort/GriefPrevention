@@ -3227,8 +3227,6 @@ public class GriefPrevention extends JavaPlugin
             this.dataStore.savePlayerDataSync(playerID, playerData);
         }
 
-        this.dataStore.close();
-
         //dump any remaining unwritten log entries
         this.customLogger.WriteEntries();
 
