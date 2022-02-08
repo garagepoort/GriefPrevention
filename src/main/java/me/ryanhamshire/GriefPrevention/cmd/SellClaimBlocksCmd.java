@@ -8,6 +8,8 @@ import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
@@ -19,13 +21,16 @@ public class SellClaimBlocksCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
     private final EconomyHandler economyHandler;
-    private final MessageService messageService;
+    private final ClaimService claimService;
+    private final ClaimBlockService claimBlockService;
 
-    public SellClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils, EconomyHandler economyHandler, MessageService messageService) {
+
+    public SellClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils, EconomyHandler economyHandler, ClaimService claimService, ClaimBlockService claimBlockService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
         this.economyHandler = economyHandler;
-        this.messageService = messageService;
+        this.claimService = claimService;
+        this.claimBlockService = claimBlockService;
     }
 
     @Override
@@ -37,28 +42,28 @@ public class SellClaimBlocksCmd extends AbstractCmd {
             //if economy is disabled, don't do anything
             EconomyHandler.EconomyWrapper economyWrapper = economyHandler.getWrapper();
             if (economyWrapper == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
+                MessageService.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
                 return;
             }
 
             if (!player.hasPermission("griefprevention.buysellclaimblocks")) {
-                messageService.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
+                MessageService.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
                 return;
             }
 
             //if disabled, error message
             if (ConfigLoader.config_economy_claimBlocksSellValue == 0) {
-                messageService.sendMessage(player, TextMode.Err, Messages.OnlyPurchaseBlocks);
+                MessageService.sendMessage(player, TextMode.Err, Messages.OnlyPurchaseBlocks);
                 return;
             }
 
             //load player data
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-            int availableBlocks = playerData.getRemainingClaimBlocks();
+            int availableBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()));
 
             //if no amount provided, just tell player value per block sold, and how many he can sell
             if (args.length != 1) {
-                messageService.sendMessage(player, TextMode.Info, Messages.BlockSaleValue, String.valueOf(ConfigLoader.config_economy_claimBlocksSellValue), String.valueOf(availableBlocks));
+                MessageService.sendMessage(player, TextMode.Info, Messages.BlockSaleValue, String.valueOf(ConfigLoader.config_economy_claimBlocksSellValue), String.valueOf(availableBlocks));
                 return;
             }
 
@@ -76,7 +81,7 @@ public class SellClaimBlocksCmd extends AbstractCmd {
 
             //if he doesn't have enough blocks, tell him so
             if (blockCount > availableBlocks) {
-                messageService.sendMessage(player, TextMode.Err, Messages.NotEnoughBlocksForSale);
+                MessageService.sendMessage(player, TextMode.Err, Messages.NotEnoughBlocksForSale);
             }
 
             //otherwise carry out the transaction
@@ -90,7 +95,8 @@ public class SellClaimBlocksCmd extends AbstractCmd {
                 this.dataStore.savePlayerData(player.getUniqueId(), playerData);
 
                 //inform player
-                messageService.sendMessage(player, TextMode.Success, Messages.BlockSaleConfirmation, String.valueOf(totalValue), String.valueOf(playerData.getRemainingClaimBlocks()));
+                int remainingClaimBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()));
+                MessageService.sendMessage(player, TextMode.Success, Messages.BlockSaleConfirmation, String.valueOf(totalValue), String.valueOf(remainingClaimBlocks));
             }
         });
 

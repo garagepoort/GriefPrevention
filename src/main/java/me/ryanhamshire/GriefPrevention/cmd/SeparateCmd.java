@@ -18,12 +18,12 @@ import org.bukkit.entity.Player;
 public class SeparateCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public SeparateCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public SeparateCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -34,20 +34,20 @@ public class SeparateCmd extends AbstractCmd {
 
         OfflinePlayer targetPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
         if (targetPlayer == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+            MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
             return true;
         }
 
         OfflinePlayer targetPlayer2 = GriefPrevention.get().resolvePlayerByName(args[1]);
         if (targetPlayer2 == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+            MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
             return true;
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
             this.setIgnoreStatus(targetPlayer, targetPlayer2, GriefPrevention.IgnoreMode.AdminIgnore);
 
-            messageService.sendMessage(player, TextMode.Success, Messages.SeparateConfirmation);
+            MessageService.sendMessage(player, TextMode.Success, Messages.SeparateConfirmation);
         });
 
         return true;

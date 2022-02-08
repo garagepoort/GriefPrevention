@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.DataStore;
-import me.ryanhamshire.GriefPrevention.GriefPrevention;
+import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.ShovelMode;
@@ -30,7 +30,7 @@ public class RestoreNatureAggressiveCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNatureAggressive;
-            messageService.sendMessage(player, TextMode.Warn, Messages.RestoreNatureAggressiveActivate);
+            MessageService.sendMessage(player, TextMode.Warn, Messages.RestoreNatureAggressiveActivate);
         });
 
         return true;

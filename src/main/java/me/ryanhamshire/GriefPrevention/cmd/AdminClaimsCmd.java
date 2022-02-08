@@ -17,12 +17,10 @@ import org.bukkit.entity.Player;
 public class AdminClaimsCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
 
-    public AdminClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public AdminClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
     }
 
     @Override
@@ -32,7 +30,7 @@ public class AdminClaimsCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Admin;
-            messageService.sendMessage(player, TextMode.Success, Messages.AdminClaimsMode);
+            MessageService.sendMessage(player, TextMode.Success, Messages.AdminClaimsMode);
         });
 
         return true;

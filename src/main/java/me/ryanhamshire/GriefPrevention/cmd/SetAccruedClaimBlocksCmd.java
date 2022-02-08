@@ -19,12 +19,12 @@ import org.bukkit.entity.Player;
 public class SetAccruedClaimBlocksCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public SetAccruedClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public SetAccruedClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -45,7 +45,7 @@ public class SetAccruedClaimBlocksCmd extends AbstractCmd {
         //find the specified player
         OfflinePlayer targetPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
         if (targetPlayer == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+            MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
             return true;
         }
 
@@ -54,7 +54,7 @@ public class SetAccruedClaimBlocksCmd extends AbstractCmd {
             playerData.setAccruedClaimBlocks(newAmount);
             this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
 
-            messageService.sendMessage(player, TextMode.Success, Messages.SetClaimBlocksSuccess);
+            MessageService.sendMessage(player, TextMode.Success, Messages.SetClaimBlocksSuccess);
             if (player != null)
                 GriefPrevention.AddLogEntry(player.getName() + " set " + targetPlayer.getName() + "'s accrued claim blocks to " + newAmount + ".", CustomLogEntryTypes.AdminActivity);
 

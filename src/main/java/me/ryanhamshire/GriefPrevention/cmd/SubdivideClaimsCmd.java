@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.DataStore;
-import me.ryanhamshire.GriefPrevention.GriefPrevention;
+import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.ShovelMode;
@@ -31,8 +31,8 @@ public class SubdivideClaimsCmd extends AbstractCmd {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Subdivide;
             playerData.claimSubdividing = null;
-            messageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionMode);
-            messageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, DataStore.SUBDIVISION_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionMode);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, DataStore.SUBDIVISION_VIDEO_URL);
         });
 
         return true;

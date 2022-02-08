@@ -9,6 +9,7 @@ import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -23,12 +24,12 @@ import java.util.function.Supplier;
 public class TrustListCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    private final ClaimService claimService;
 
-    public TrustListCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public TrustListCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        this.claimService = claimService;
     }
 
     @Override
@@ -37,18 +38,18 @@ public class TrustListCmd extends AbstractCmd {
         Player player = (Player) sender;
         bukkitUtils.runTaskAsync(sender, () -> {
 
-            Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, null);
+            Claim claim = this.claimService.getClaimAt(player.getLocation(), true, null);
 
             //if no claim here, error message
             if (claim == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.TrustListNoClaim);
+                MessageService.sendMessage(player, TextMode.Err, Messages.TrustListNoClaim);
                 return;
             }
 
             //if no permission to manage permissions, error message
-            Supplier<String> errorMessage = claim.checkPermission(player, ClaimPermission.Manage, null);
+            Supplier<String> errorMessage = claimService.checkPermission(claim, player, ClaimPermission.Manage, null);
             if (errorMessage != null) {
-                messageService.sendMessage(player, TextMode.Err, errorMessage.get());
+                MessageService.sendMessage(player, TextMode.Err, errorMessage.get());
                 return;
             }
 
@@ -60,7 +61,7 @@ public class TrustListCmd extends AbstractCmd {
             ArrayList<String> managers = new ArrayList<>();
             claim.getPermissions(builders, containers, accessors, managers);
 
-            messageService.sendMessage(player, TextMode.Info, Messages.TrustListHeader);
+            MessageService.sendMessage(player, TextMode.Info, Messages.TrustListHeader);
 
             StringBuilder permissions = new StringBuilder();
             permissions.append(ChatColor.GOLD).append('>');
@@ -106,7 +107,7 @@ public class TrustListCmd extends AbstractCmd {
                     ChatColor.BLUE + MessageService.getMessage(Messages.Access));
 
             if (claim.getSubclaimRestrictions()) {
-                messageService.sendMessage(player, TextMode.Err, Messages.HasSubclaimRestriction);
+                MessageService.sendMessage(player, TextMode.Err, Messages.HasSubclaimRestriction);
             }
         });
 

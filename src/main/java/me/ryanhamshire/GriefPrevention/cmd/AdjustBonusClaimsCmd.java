@@ -5,6 +5,7 @@ import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
 import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
+import me.ryanhamshire.GriefPrevention.GroupBonusBlocksService;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -21,12 +22,12 @@ import java.util.UUID;
 public class AdjustBonusClaimsCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    private final GroupBonusBlocksService groupBonusBlocksService;
 
-    public AdjustBonusClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public AdjustBonusClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, GroupBonusBlocksService groupBonusBlocksService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        this.groupBonusBlocksService = groupBonusBlocksService;
     }
 
     @Override
@@ -49,9 +50,9 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
             //if granting blocks to all players with a specific permission
             if (args[0].startsWith("[") && args[0].endsWith("]")) {
                 String permissionIdentifier = args[0].substring(1, args[0].length() - 1);
-                int newTotal = this.dataStore.adjustGroupBonusBlocks(permissionIdentifier, adjustment);
+                int newTotal = groupBonusBlocksService.adjustGroupBonusBlocks(permissionIdentifier, adjustment);
 
-                messageService.sendMessage(player, TextMode.Success, Messages.AdjustGroupBlocksSuccess, permissionIdentifier, String.valueOf(adjustment), String.valueOf(newTotal));
+                MessageService.sendMessage(player, TextMode.Success, Messages.AdjustGroupBlocksSuccess, permissionIdentifier, String.valueOf(adjustment), String.valueOf(newTotal));
                 if (player != null)
                     GriefPrevention.AddLogEntry(player.getName() + " adjusted " + permissionIdentifier + "'s bonus claim blocks by " + adjustment + ".");
                 return;
@@ -67,7 +68,7 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
             }
 
             if (targetPlayer == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return;
             }
 
@@ -76,7 +77,7 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
             playerData.setBonusClaimBlocks(playerData.getBonusClaimBlocks() + adjustment);
             this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
 
-            messageService.sendMessage(player, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
+            MessageService.sendMessage(player, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
             if (player != null)
                 GriefPrevention.AddLogEntry(player.getName() + " adjusted " + targetPlayer.getName() + "'s bonus claim blocks by " + adjustment + ".", CustomLogEntryTypes.AdminActivity);
         });

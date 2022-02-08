@@ -21,12 +21,10 @@ import java.util.UUID;
 public class AdjustBonusClaimBlocksAllCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
 
-    public AdjustBonusClaimBlocksAllCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public AdjustBonusClaimBlocksAllCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
     }
 
     @Override
@@ -54,7 +52,7 @@ public class AdjustBonusClaimBlocksAllCmd extends AbstractCmd {
                 builder.append(onlinePlayer.getName()).append(' ');
             }
 
-            messageService.sendMessage(player, TextMode.Success, Messages.AdjustBlocksAllSuccess, String.valueOf(adjustment));
+            MessageService.sendMessage(player, TextMode.Success, Messages.AdjustBlocksAllSuccess, String.valueOf(adjustment));
             GriefPrevention.AddLogEntry("Adjusted all " + players.size() + "players' bonus claim blocks by " + adjustment + ".  " + builder.toString(), CustomLogEntryTypes.AdminActivity);
         });
 

@@ -20,12 +20,12 @@ import java.util.UUID;
 public class IgnoredPlayerListCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public IgnoredPlayerListCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public IgnoredPlayerListCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -47,9 +47,9 @@ public class IgnoredPlayerListCmd extends AbstractCmd {
 
             String list = builder.toString().trim();
             if (list.isEmpty()) {
-                messageService.sendMessage(player, TextMode.Info, Messages.NotIgnoringAnyone);
+                MessageService.sendMessage(player, TextMode.Info, Messages.NotIgnoringAnyone);
             } else {
-                messageService.sendMessage(player, TextMode.Info, list);
+                MessageService.sendMessage(player, TextMode.Info, list);
             }
         });
 

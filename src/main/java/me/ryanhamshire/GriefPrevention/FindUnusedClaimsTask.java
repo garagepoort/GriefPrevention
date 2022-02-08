@@ -20,6 +20,7 @@ package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.IocBean;
 import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -44,11 +45,13 @@ public class FindUnusedClaimsTask extends BukkitRunnable
     private Iterator<UUID> claimOwnerIterator;
     private final DataStore dataStore;
     private final ClaimBlockService claimBlockService;
+    private final ClaimService claimService;
 
-    public FindUnusedClaimsTask(DataStore dataStore, ClaimBlockService claimBlockService)
+    public FindUnusedClaimsTask(DataStore dataStore, ClaimBlockService claimBlockService, ClaimService claimService)
     {
         this.dataStore = dataStore;
         this.claimBlockService = claimBlockService;
+        this.claimService = claimService;
         refreshUUIDs();
         Bukkit.getScheduler().scheduleSyncRepeatingTask(GriefPrevention.get(), this, 20L * 60, 20L * ConfigLoader.config_advanced_claim_expiration_check_rate);
 
@@ -68,13 +71,13 @@ public class FindUnusedClaimsTask extends BukkitRunnable
         }
 
         GriefPrevention.instance.getServer().getScheduler().runTaskAsynchronously(GriefPrevention.instance,
-            new CleanupUnusedClaimPreTask(claimOwnerIterator.next(), dataStore, claimBlockService));
+            new CleanupUnusedClaimPreTask(claimOwnerIterator.next(), dataStore, claimBlockService, claimService));
     }
 
     public void refreshUUIDs()
     {
         // Fetch owner UUIDs from list of claims
-        claimOwnerUUIDs = dataStore.claims.stream().map(claim -> claim.ownerID)
+        claimOwnerUUIDs = claimService.getClaims().stream().map(claim -> claim.ownerID)
                 .distinct().filter(Objects::nonNull).collect(Collectors.toList());
 
         if (!claimOwnerUUIDs.isEmpty())

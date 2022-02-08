@@ -18,16 +18,13 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.database.DatabaseException;
+import me.ryanhamshire.GriefPrevention.database.SqlConnectionProvider;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.World;
 import org.bukkit.entity.Player;
 
-import javax.sql.DataSource;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
@@ -36,12 +33,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 //manages data stored in the file system
 public class DatabaseDataStore extends DataStore
@@ -49,10 +43,6 @@ public class DatabaseDataStore extends DataStore
 
     private static final String SQL_UPDATE_NAME =
             "UPDATE griefprevention_playerdata SET name = ? WHERE name = ?";
-    private static final String SQL_INSERT_CLAIM =
-            "INSERT INTO griefprevention_claimdata (id, owner, lessercorner, greatercorner, builders, containers, accessors, managers, inheritnothing, parentid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    private static final String SQL_DELETE_CLAIM =
-            "DELETE FROM griefprevention_claimdata WHERE id = ?";
     private static final String SQL_SELECT_PLAYER_DATA =
             "SELECT * FROM griefprevention_playerdata WHERE name = ?";
     private static final String SQL_DELETE_PLAYER_DATA =
@@ -72,16 +62,11 @@ public class DatabaseDataStore extends DataStore
     private static final String SQL_SELECT_SCHEMA_VERSION =
             "SELECT * FROM griefprevention_schemaversion";
 
-    private final String databaseUrl;
-    private final String userName;
-    private final String password;
-
-    public DatabaseDataStore(String url, String userName, String password) throws Exception
+    private final SqlConnectionProvider sqlConnectionProvider;
+    public DatabaseDataStore(SqlConnectionProvider sqlConnectionProvider) throws Exception
     {
-        super(messageService);
-        this.databaseUrl = url;
-        this.userName = userName;
-        this.password = password;
+        super();
+        this.sqlConnectionProvider = sqlConnectionProvider;
 
         this.initialize();
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -92,7 +77,7 @@ public class DatabaseDataStore extends DataStore
     @Override
     void initialize() throws Exception
     {
-        try (Connection connection = this.getDataConnection())
+        try (Connection connection = sqlConnectionProvider.getConnection())
         {
 
             try (Statement statement = connection.createStatement())
@@ -106,7 +91,7 @@ public class DatabaseDataStore extends DataStore
                 // By making this run only for MySQL, we technically support SQLite too, as this is the only invalid
                 // SQL we use that SQLite does not support. Seeing as its only use is to update VERY old, existing, MySQL
                 // databases, this is of no concern.
-                if (databaseUrl.startsWith("jdbc:mysql://"))
+                if (ConfigLoader.databaseUrl.startsWith("jdbc:mysql://"))
                 {
                     statement.execute("ALTER TABLE griefprevention_claimdata MODIFY builders TEXT");
                     statement.execute("ALTER TABLE griefprevention_claimdata MODIFY containers TEXT");
@@ -130,271 +115,6 @@ public class DatabaseDataStore extends DataStore
                 throw e3;
             }
 
-            //load group data into memory
-            Statement statement = connection.createStatement();
-            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
-
-            while (results.next())
-            {
-                String name = results.getString("name");
-
-                //ignore non-groups.  all group names start with a dollar sign.
-                if (!name.startsWith("$")) continue;
-
-                String groupName = name.substring(1);
-                if (groupName == null || groupName.isEmpty()) continue;  //defensive coding, avoid unlikely cases
-
-                int groupBonusBlocks = results.getInt("bonusblocks");
-
-                this.permissionToBonusBlocksMap.put(groupName, groupBonusBlocks);
-            }
-
-            //load next claim number into memory
-            results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid");
-
-            //if there's nothing yet, add it
-            if (!results.next())
-            {
-                statement.execute("INSERT INTO griefprevention_nextclaimid VALUES (0)");
-                this.nextClaimID = (long) 0;
-            }
-
-            //otherwise load it
-            else
-            {
-                this.nextClaimID = results.getLong("nextid");
-            }
-
-            if (this.getSchemaVersion() == 0)
-            {
-                try
-                {
-
-                    //pull ALL player data from the database
-                    statement = connection.createStatement();
-                    results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
-
-                    //make a list of changes to be made
-                    HashMap<String, UUID> changes = new HashMap<>();
-
-                    ArrayList<String> namesToConvert = new ArrayList<>();
-                    while (results.next())
-                    {
-                        //get the id
-                        String playerName = results.getString("name");
-
-                        //add to list of names to convert to UUID
-                        namesToConvert.add(playerName);
-                    }
-
-                    //resolve and cache as many as possible through various means
-                    try
-                    {
-                        UUIDFetcher fetcher = new UUIDFetcher(namesToConvert);
-                        fetcher.call();
-                    }
-                    catch (Exception e)
-                    {
-                        GriefPrevention.AddLogEntry("Failed to resolve a batch of names to UUIDs.  Details:" + e.getMessage());
-                        e.printStackTrace();
-                    }
-
-                    //reset results cursor
-                    results.beforeFirst();
-
-                    //for each result
-                    while (results.next())
-                    {
-                        //get the id
-                        String playerName = results.getString("name");
-
-                        //try to convert player name to UUID
-                        try
-                        {
-                            UUID playerID = UUIDFetcher.getUUIDOf(playerName);
-
-                            //if successful, update the playerdata row by replacing the player's name with the player's UUID
-                            if (playerID != null)
-                            {
-                                changes.put(playerName, playerID);
-                            }
-                        }
-                        //otherwise leave it as-is. no harm done - it won't be requested by name, and this update only happens once.
-                        catch (Exception ex) {}
-                    }
-
-                    for (String name : changes.keySet())
-                    {
-                        try (PreparedStatement updateStmnt = connection.prepareStatement(SQL_UPDATE_NAME))
-                        {
-                            updateStmnt.setString(1, changes.get(name).toString());
-                            updateStmnt.setString(2, name);
-                            updateStmnt.executeUpdate();
-                        }
-                        catch (SQLException e)
-                        {
-                            GriefPrevention.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
-                            GriefPrevention.AddLogEntry(e.getMessage());
-                            throw new DatabaseException(e.getCause());
-                        }
-                    }
-                }
-                catch (SQLException e)
-                {
-                    GriefPrevention.AddLogEntry("Unable to convert player data.  Details:");
-                    GriefPrevention.AddLogEntry(e.getMessage());
-                    throw new DatabaseException(e.getCause());
-                }
-            }
-
-            if (this.getSchemaVersion() <= 2)
-            {
-                statement = connection.createStatement();
-                statement.execute("ALTER TABLE griefprevention_claimdata ADD inheritNothing BOOLEAN DEFAULT 0 AFTER managers");
-            }
-
-            //load claims data into memory
-
-            results = statement.executeQuery("SELECT * FROM griefprevention_claimdata");
-
-            ArrayList<Claim> claimsToRemove = new ArrayList<>();
-            ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
-            List<World> validWorlds = Bukkit.getServer().getWorlds();
-
-            Long claimID = null;
-            while (results.next())
-            {
-                try
-                {
-                    //problematic claims will be removed from secondary storage, and never added to in-memory data store
-                    boolean removeClaim = false;
-
-                    long parentId = results.getLong("parentid");
-                    claimID = results.getLong("id");
-                    boolean inheritNothing = results.getBoolean("inheritNothing");
-                    Location lesserBoundaryCorner = null;
-                    Location greaterBoundaryCorner = null;
-                    String lesserCornerString = "(location not available)";
-                    try
-                    {
-                        lesserCornerString = results.getString("lessercorner");
-                        lesserBoundaryCorner = this.locationFromString(lesserCornerString, validWorlds);
-                        String greaterCornerString = results.getString("greatercorner");
-                        greaterBoundaryCorner = this.locationFromString(greaterCornerString, validWorlds);
-                    }
-                    catch (Exception e)
-                    {
-                        if (e.getMessage() != null && e.getMessage().contains("World not found"))
-                        {
-                            GriefPrevention.AddLogEntry("Failed to load a claim (ID:" + claimID.toString() + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
-                            continue;
-                        }
-                        else
-                        {
-                            throw e;
-                        }
-                    }
-
-                    String ownerName = results.getString("owner");
-                    UUID ownerID = null;
-                    if (ownerName.isEmpty() || ownerName.startsWith("--"))
-                    {
-                        ownerID = null;  //administrative land claim or subdivision
-                    }
-                    else if (this.getSchemaVersion() < 1)
-                    {
-                        try
-                        {
-                            ownerID = UUIDFetcher.getUUIDOf(ownerName);
-                        }
-                        catch (Exception ex)
-                        {
-                            GriefPrevention.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
-                            GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
-                        }
-                    }
-                    else
-                    {
-                        try
-                        {
-                            ownerID = UUID.fromString(ownerName);
-                        }
-                        catch (Exception ex)
-                        {
-                            GriefPrevention.AddLogEntry("This owner entry is not a UUID: " + ownerName + ".");
-                            GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
-                        }
-                    }
-
-                    String buildersString = results.getString("builders");
-                    List<String> builderNames = Arrays.asList(buildersString.split(";"));
-                    builderNames = this.convertNameListToUUIDList(builderNames);
-
-                    String containersString = results.getString("containers");
-                    List<String> containerNames = Arrays.asList(containersString.split(";"));
-                    containerNames = this.convertNameListToUUIDList(containerNames);
-
-                    String accessorsString = results.getString("accessors");
-                    List<String> accessorNames = Arrays.asList(accessorsString.split(";"));
-                    accessorNames = this.convertNameListToUUIDList(accessorNames);
-
-                    String managersString = results.getString("managers");
-                    List<String> managerNames = Arrays.asList(managersString.split(";"));
-                    managerNames = this.convertNameListToUUIDList(managerNames);
-                    Claim claim = new Claim(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderNames, containerNames, accessorNames, managerNames, inheritNothing, claimID);
-
-                    if (removeClaim)
-                    {
-                        claimsToRemove.add(claim);
-                    }
-                    else if (parentId == -1)
-                    {
-                        //top level claim
-                        this.addClaim(claim, false);
-                    }
-                    else
-                    {
-                        //subdivision
-                        subdivisionsToLoad.add(claim);
-                    }
-                }
-                catch (SQLException e)
-                {
-                    GriefPrevention.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
-                    throw new DatabaseException(e.getCause());
-                }
-            }
-
-            //add subdivisions to their parent claims
-            for (Claim childClaim : subdivisionsToLoad)
-            {
-                //find top level claim parent
-                Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), true, null);
-
-                if (topLevelClaim == null)
-                {
-                    claimsToRemove.add(childClaim);
-                    GriefPrevention.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
-                    continue;
-                }
-
-                //add this claim to the list of children of the current top level claim
-                childClaim.parent = topLevelClaim;
-                topLevelClaim.children.add(childClaim);
-                childClaim.inDataStore = true;
-            }
-
-            for (Claim claim : claimsToRemove)
-            {
-                this.deleteClaimFromSecondaryStorage(claim);
-            }
-
-            if (this.getSchemaVersion() <= 2)
-            {
-                statement = connection.createStatement();
-                statement.execute("DELETE FROM griefprevention_claimdata WHERE id = '-1'");
-            }
-
             super.initialize();
 
         }
@@ -406,93 +126,12 @@ public class DatabaseDataStore extends DataStore
     }
 
     @Override
-    synchronized void writeClaimToStorage(Claim claim)  //see datastore.cs.  this will ALWAYS be a top level claim
-    {
-        try
-        {
-            //wipe out any existing data about this claim
-            this.deleteClaimFromSecondaryStorage(claim);
-
-            //write claim data to the database
-            this.writeClaimData(claim);
-        }
-        catch (SQLException e)
-        {
-            GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
-            throw new DatabaseException(e.getCause());
-        }
-    }
-
-    //actually writes claim data to the database
-    synchronized private void writeClaimData(Claim claim) throws SQLException
-    {
-        String lesserCornerString = this.locationToString(claim.getLesserBoundaryCorner());
-        String greaterCornerString = this.locationToString(claim.getGreaterBoundaryCorner());
-        String owner = "";
-        if (claim.ownerID != null) owner = claim.ownerID.toString();
-
-        ArrayList<String> builders = new ArrayList<>();
-        ArrayList<String> containers = new ArrayList<>();
-        ArrayList<String> accessors = new ArrayList<>();
-        ArrayList<String> managers = new ArrayList<>();
-
-        claim.getPermissions(builders, containers, accessors, managers);
-
-        String buildersString = this.storageStringBuilder(builders);
-        String containersString = this.storageStringBuilder(containers);
-        String accessorsString = this.storageStringBuilder(accessors);
-        String managersString = this.storageStringBuilder(managers);
-        boolean inheritNothing = claim.getSubclaimRestrictions();
-        long parentId = claim.parent == null ? -1 : claim.parent.id;
-
-        try (PreparedStatement insertStmt = this.getDataConnection().prepareStatement(SQL_INSERT_CLAIM))
-        {
-
-            insertStmt.setLong(1, claim.id);
-            insertStmt.setString(2, owner);
-            insertStmt.setString(3, lesserCornerString);
-            insertStmt.setString(4, greaterCornerString);
-            insertStmt.setString(5, buildersString);
-            insertStmt.setString(6, containersString);
-            insertStmt.setString(7, accessorsString);
-            insertStmt.setString(8, managersString);
-            insertStmt.setBoolean(9, inheritNothing);
-            insertStmt.setLong(10, parentId);
-            insertStmt.executeUpdate();
-        }
-        catch (SQLException e)
-        {
-            GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
-            throw new DatabaseException(e.getCause());
-        }
-    }
-
-    //deletes a claim from the database
-    @Override
-    synchronized void deleteClaimFromSecondaryStorage(Claim claim)
-    {
-        try (PreparedStatement deleteStmnt = this.getDataConnection().prepareStatement(SQL_DELETE_CLAIM))
-        {
-            deleteStmnt.setLong(1, claim.id);
-            deleteStmnt.executeUpdate();
-        }
-        catch (SQLException e)
-        {
-            GriefPrevention.AddLogEntry("Unable to delete data for claim " + claim.id + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
-            throw new DatabaseException(e.getCause());
-        }
-    }
-
-    @Override
     PlayerData getPlayerDataFromStorage(UUID playerID)
     {
         PlayerData playerData = new PlayerData();
         playerData.playerID = playerID;
 
-        try (PreparedStatement selectStmnt = this.getDataConnection().prepareStatement(SQL_SELECT_PLAYER_DATA))
+        try (PreparedStatement selectStmnt = sqlConnectionProvider.getConnection().prepareStatement(SQL_SELECT_PLAYER_DATA))
         {
             selectStmnt.setString(1, playerID.toString());
             ResultSet results = selectStmnt.executeQuery();
@@ -525,9 +164,31 @@ public class DatabaseDataStore extends DataStore
         this.savePlayerData(playerID.toString(), playerData);
     }
 
+    @Override
+    public ConcurrentHashMap<String, Integer> getGroupBonusBlocks() {
+        ConcurrentHashMap<String, Integer> permissionBonusBlocks = new ConcurrentHashMap<>();
+
+        try (Statement statement = sqlConnectionProvider.getConnection().createStatement()){
+            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
+
+            while (results.next())
+            {
+                String name = results.getString("name");
+                if (!name.startsWith("$")) continue;
+                String groupName = name.substring(1);
+                if (groupName.isEmpty()) continue;
+                int groupBonusBlocks = results.getInt("bonusblocks");
+                permissionBonusBlocks.put(groupName, groupBonusBlocks);
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException(e.getCause());
+        }
+        return permissionBonusBlocks;
+    }
+
     private void savePlayerData(String playerID, PlayerData playerData)
     {
-        try (Connection databaseConnection = getDataConnection(); PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_PLAYER_DATA);
+        try (Connection databaseConnection = sqlConnectionProvider.getConnection(); PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_PLAYER_DATA);
              PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
         {
             OfflinePlayer player = Bukkit.getOfflinePlayer(UUID.fromString(playerID));
@@ -552,39 +213,12 @@ public class DatabaseDataStore extends DataStore
         }
     }
 
-    @Override
-    synchronized void incrementNextClaimID()
-    {
-        this.setNextClaimID(this.nextClaimID + 1);
-    }
-
-    //sets the next claim ID.  used by incrementNextClaimID() above, and also while migrating data from a flat file data store
-    synchronized void setNextClaimID(long nextID)
-    {
-        this.nextClaimID = nextID;
-
-        try (Connection databaseConnection = this.getDataConnection();
-             PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_NEXT_CLAIM_ID);
-             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_SET_NEXT_CLAIM_ID))
-        {
-            deleteStmnt.execute();
-            insertStmnt.setLong(1, nextID);
-            insertStmnt.executeUpdate();
-        }
-        catch (SQLException e)
-        {
-            GriefPrevention.AddLogEntry("Unable to set next claim ID to " + nextID + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
-            throw new DatabaseException(e.getCause());
-        }
-    }
-
     //updates the database with a group's bonus blocks
     @Override
     synchronized void saveGroupBonusBlocks(String groupName, int currentValue)
     {
         //group bonus blocks are stored in the player data table, with player name = $groupName
-        try (Connection databaseConnection = this.getDataConnection();
+        try (Connection databaseConnection = sqlConnectionProvider.getConnection();
              PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_GROUP_DATA);
              PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
         {
@@ -607,45 +241,10 @@ public class DatabaseDataStore extends DataStore
         }
     }
 
-    private HikariDataSource datasource;
-
-    public DataSource getDatasource() {
-        if (datasource == null) {
-            getDataSource();
-        }
-        return datasource;
-    }
-
-    public Connection getDataConnection() {
-        try {
-            Class.forName("com.mysql.jdbc.Driver");
-            return getDatasource().getConnection();
-        } catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException("Failed to connect to the database", e);
-        }
-    }
-
-    private void getDataSource() {
-        if (datasource == null) {
-            HikariConfig config = new HikariConfig();
-            config.setJdbcUrl(this.databaseUrl);
-            config.setUsername(this.userName);
-            config.setPassword(password);
-            config.setMaximumPoolSize(5);
-            config.setLeakDetectionThreshold(5000);
-            config.setAutoCommit(true);
-            config.setDriverClassName("com.mysql.jdbc.Driver");
-            config.addDataSourceProperty("cachePrepStmts", "true");
-            config.addDataSourceProperty("prepStmtCacheSize", "250");
-            config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-            datasource = new HikariDataSource(config);
-        }
-    }
-
     @Override
     protected int getSchemaVersionFromStorage()
     {
-        try (PreparedStatement selectStmnt = this.getDataConnection().prepareStatement(SQL_SELECT_SCHEMA_VERSION))
+        try (PreparedStatement selectStmnt = sqlConnectionProvider.getConnection().prepareStatement(SQL_SELECT_SCHEMA_VERSION))
         {
             ResultSet results = selectStmnt.executeQuery();
 
@@ -672,7 +271,7 @@ public class DatabaseDataStore extends DataStore
     @Override
     protected void updateSchemaVersionInStorage(int versionToSet)
     {
-        try (Connection databaseConnection = this.getDataConnection();
+        try (Connection databaseConnection = sqlConnectionProvider.getConnection();
              PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_SCHEMA_VERSION);
              PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_SCHEMA_VERSION))
         {
@@ -687,22 +286,6 @@ public class DatabaseDataStore extends DataStore
             GriefPrevention.AddLogEntry(e.getMessage());
             throw new DatabaseException(e.getCause());
         }
-    }
-
-    /**
-     * Concats an array to a string divided with the ; sign
-     *
-     * @param input Arraylist with strings to concat
-     * @return String with all values from input array
-     */
-    private String storageStringBuilder(ArrayList<String> input)
-    {
-        String output = "";
-        for (String string : input)
-        {
-            output += string + ";";
-        }
-        return output;
     }
 
 }

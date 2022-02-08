@@ -14,10 +14,11 @@ public class GroupBonusBlocksService {
 
 
     //in-memory cache for group (permission-based) data
-    protected ConcurrentHashMap<String, Integer> permissionToBonusBlocksMap = new ConcurrentHashMap<>();
+    protected ConcurrentHashMap<String, Integer> permissionToBonusBlocksMap;
 
     public GroupBonusBlocksService(DataStore dataStore) {
         this.dataStore = dataStore;
+        permissionToBonusBlocksMap = dataStore.getGroupBonusBlocks();
     }
 
     //gets the number of bonus blocks a player has from his permissions

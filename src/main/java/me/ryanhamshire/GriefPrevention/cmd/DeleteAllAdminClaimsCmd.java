@@ -10,6 +10,7 @@ import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
 import me.ryanhamshire.GriefPrevention.Visualization;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -19,12 +20,12 @@ import org.bukkit.entity.Player;
 public class DeleteAllAdminClaimsCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    private final ClaimService claimService;
 
-    public DeleteAllAdminClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public DeleteAllAdminClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        this.claimService = claimService;
     }
 
     @Override
@@ -32,16 +33,16 @@ public class DeleteAllAdminClaimsCmd extends AbstractCmd {
         validateIsPlayer(sender);
         Player player = (Player) sender;
         if (!player.hasPermission("griefprevention.deleteclaims")) {
-            messageService.sendMessage(player, TextMode.Err, Messages.NoDeletePermission);
+            MessageService.sendMessage(player, TextMode.Err, Messages.NoDeletePermission);
             return true;
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
             //delete all admin claims
-            this.dataStore.deleteClaimsForPlayer(null, true);  //null for owner id indicates an administrative claim
+            claimService.deleteClaimsForPlayer(null, true);  //null for owner id indicates an administrative claim
 
-            messageService.sendMessage(player, TextMode.Success, Messages.AllAdminDeleted);
+            MessageService.sendMessage(player, TextMode.Success, Messages.AllAdminDeleted);
             GriefPrevention.AddLogEntry(player.getName() + " deleted all administrative claims.", CustomLogEntryTypes.AdminActivity);
 
             bukkitUtils.runTaskLater(player, () -> Visualization.Revert(player, playerData));

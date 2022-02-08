@@ -36,16 +36,16 @@ public class PlayerRescueTask implements Runnable
 
     //player data
     private final Player player;
-    private final MessageService messageService;
+    
 
-    public PlayerRescueTask(Player player, Location location, Location destination, DataStore dataStore, PlayerRescueService playerRescueService, MessageService messageService)
+    public PlayerRescueTask(Player player, Location location, Location destination, DataStore dataStore, PlayerRescueService playerRescueService)
     {
         this.player = player;
         this.location = location;
         this.destination = destination;
         this.dataStore = dataStore;
         this.playerRescueService = playerRescueService;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -61,7 +61,7 @@ public class PlayerRescueTask implements Runnable
         //if the player moved three or more blocks from where he used /trapped, admonish him and don't save him
         if (!player.getLocation().getWorld().equals(this.location.getWorld()) || player.getLocation().distance(this.location) > 3)
         {
-            messageService.sendMessage(player, TextMode.Err, Messages.RescueAbortedMoved);
+            MessageService.sendMessage(player, TextMode.Err, Messages.RescueAbortedMoved);
             return;
         }
 

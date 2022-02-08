@@ -18,12 +18,12 @@ import org.bukkit.entity.Player;
 public class IgnorePlayerCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public IgnorePlayerCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public IgnorePlayerCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -34,13 +34,13 @@ public class IgnorePlayerCmd extends AbstractCmd {
 
         OfflinePlayer targetPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
         if (targetPlayer == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+            MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
             return true;
         }
         
         bukkitUtils.runTaskAsync(sender, () -> {
             this.setIgnoreStatus(player, targetPlayer, GriefPrevention.IgnoreMode.StandardIgnore);
-            messageService.sendMessage(player, TextMode.Success, Messages.IgnoreConfirmation);
+            MessageService.sendMessage(player, TextMode.Success, Messages.IgnoreConfirmation);
         });
 
         return true;

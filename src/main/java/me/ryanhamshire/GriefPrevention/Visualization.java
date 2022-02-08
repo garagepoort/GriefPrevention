@@ -40,14 +40,13 @@ public class Visualization
     public ArrayList<VisualizationElement> elements = new ArrayList<>();
 
     //sends a visualization to a player
-    public static void Apply(Player player, Visualization visualization)
+    public static void Apply(Player player, PlayerData playerData, Visualization visualization)
     {
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
 
         //if he has any current visualization, clear it first
         if (playerData.currentVisualization != null)
         {
-            Visualization.Revert(player);
+            Visualization.Revert(player, playerData);
         }
 
         //if he's online, create a task to send him the visualization

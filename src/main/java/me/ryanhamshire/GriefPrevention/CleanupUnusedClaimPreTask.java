@@ -19,6 +19,7 @@
 package me.ryanhamshire.GriefPrevention;
 
 import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -30,15 +31,17 @@ import java.util.UUID;
 
 class CleanupUnusedClaimPreTask implements Runnable
 {
-    private UUID ownerID = null;
+    private UUID ownerID;
     private final DataStore dataStore;
     private final ClaimBlockService claimBlockService;
+    private final ClaimService claimService;
 
-    CleanupUnusedClaimPreTask(UUID uuid, DataStore dataStore, ClaimBlockService claimBlockService)
+    CleanupUnusedClaimPreTask(UUID uuid, DataStore dataStore, ClaimBlockService claimBlockService, ClaimService claimService)
     {
         this.ownerID = uuid;
         this.dataStore = dataStore;
         this.claimBlockService = claimBlockService;
+        this.claimService = claimService;
     }
 
     @Override
@@ -73,7 +76,7 @@ class CleanupUnusedClaimPreTask implements Runnable
 
         Claim claimToExpire = null;
 
-        for (Claim claim : dataStore.getClaims())
+        for (Claim claim : claimService.getClaims())
         {
             if (ownerID.equals(claim.ownerID))
             {
@@ -89,6 +92,6 @@ class CleanupUnusedClaimPreTask implements Runnable
         }
 
         //pass it back to the main server thread, where it's safe to delete a claim if needed
-        Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, new CleanupUnusedClaimTask(claimToExpire, ownerData, ownerInfo, dataStore), 1L);
+        Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, new CleanupUnusedClaimTask(claimToExpire, ownerData, ownerInfo, claimService), 1L);
     }
 }

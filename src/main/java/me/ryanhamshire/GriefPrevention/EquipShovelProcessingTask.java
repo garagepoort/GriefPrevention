@@ -32,15 +32,15 @@ class EquipShovelProcessingTask implements Runnable
     //player data
     private final Player player;
     private final DataStore dataStore;
-    private final MessageService messageService;
+    
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
 
-    public EquipShovelProcessingTask(Player player, DataStore dataStore, MessageService messageService, ClaimService claimService, ClaimBlockService claimBlockService)
+    public EquipShovelProcessingTask(Player player, DataStore dataStore, ClaimService claimService, ClaimBlockService claimBlockService)
     {
         this.player = player;
         this.dataStore = dataStore;
-        this.messageService = messageService;
+        
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
     }
@@ -62,29 +62,29 @@ class EquipShovelProcessingTask implements Runnable
         if (playerData.shovelMode != ShovelMode.Basic)
         {
             playerData.shovelMode = ShovelMode.Basic;
-            messageService.sendMessage(player, TextMode.Info, Messages.ShovelBasicClaimMode);
+            MessageService.sendMessage(player, TextMode.Info, Messages.ShovelBasicClaimMode);
         }
 
         //tell him how many claim blocks he has available
-        int remainingBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player));
-        messageService.sendMessage(player, TextMode.Instr, Messages.RemainingBlocks, String.valueOf(remainingBlocks));
+        int remainingBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()));
+        MessageService.sendMessage(player, TextMode.Instr, Messages.RemainingBlocks, String.valueOf(remainingBlocks));
 
         //link to a video demo of land claiming, based on world type
         if (ConfigLoader.creativeRulesApply(player.getLocation()))
         {
-            messageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
         }
         else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
         {
-            messageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
         }
 
         //if standing in a claim owned by the player, visualize it
-        Claim claim = dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
-        if (claim != null && claim.checkPermission(player, ClaimPermission.Edit, null) == null)
+        Claim claim = claimService.getClaimAt(player.getLocation(), true, playerData.lastClaim);
+        if (claim != null && claimService.checkPermission(claim, player, ClaimPermission.Edit, null) == null)
         {
             playerData.lastClaim = claim;
-            Visualization.Apply(player, Visualization.FromClaim(claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation()));
+            Visualization.Apply(player, playerData, Visualization.FromClaim(claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation()));
         }
     }
 }

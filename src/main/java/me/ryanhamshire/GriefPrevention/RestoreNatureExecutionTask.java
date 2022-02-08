@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -32,7 +33,7 @@ import java.util.ArrayList;
 
 //this main thread task takes the output from the RestoreNatureProcessingTask\
 //and updates the world accordingly
-class RestoreNatureExecutionTask implements Runnable
+public class RestoreNatureExecutionTask implements Runnable
 {
     //results from processing thread
     //will be applied to the world
@@ -45,14 +46,18 @@ class RestoreNatureExecutionTask implements Runnable
 
     //player who should be notified about the result (will see a visualization when the restoration is complete)
     private final Player player;
+    private final DataStore dataStore;
+    private final ClaimService claimService;
 
-    public RestoreNatureExecutionTask(BlockSnapshot[][][] snapshots, int miny, Location lesserCorner, Location greaterCorner, Player player)
+    public RestoreNatureExecutionTask(BlockSnapshot[][][] snapshots, int miny, Location lesserCorner, Location greaterCorner, Player player, DataStore dataStore, ClaimService claimService)
     {
         this.snapshots = snapshots;
         this.miny = miny;
         this.lesserCorner = lesserCorner;
         this.greaterCorner = greaterCorner;
         this.player = player;
+        this.dataStore = dataStore;
+        this.claimService = claimService;
     }
 
 
@@ -73,7 +78,7 @@ class RestoreNatureExecutionTask implements Runnable
                     Block currentBlock = blockUpdate.location.getBlock();
                     if (blockUpdate.typeId != currentBlock.getType() || !blockUpdate.data.equals(currentBlock.getBlockData()))
                     {
-                        Claim claim = GriefPrevention.instance.dataStore.getClaimAt(blockUpdate.location, false, cachedClaim);
+                        Claim claim = claimService.getClaimAt(blockUpdate.location, false, cachedClaim);
                         if (claim != null)
                         {
                             cachedClaim = claim;
@@ -102,7 +107,7 @@ class RestoreNatureExecutionTask implements Runnable
             if (!(entity instanceof Player || entity instanceof Animals))
             {
                 //hanging entities (paintings, item frames) are protected when they're in land claims
-                if (!(entity instanceof Hanging) || GriefPrevention.instance.dataStore.getClaimAt(entity.getLocation(), false, null) == null)
+                if (!(entity instanceof Hanging) || claimService.getClaimAt(entity.getLocation(), false, null) == null)
                 {
                     //everything else is removed
                     entity.remove();
@@ -123,7 +128,8 @@ class RestoreNatureExecutionTask implements Runnable
         {
             Claim claim = new Claim(lesserCorner, greaterCorner, null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), null);
             Visualization visualization = Visualization.FromClaim(claim, player.getLocation().getBlockY(), VisualizationType.RestoreNature, player.getLocation());
-            Visualization.Apply(player, visualization);
+            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+            Visualization.Apply(player, playerData, visualization);
         }
     }
 }

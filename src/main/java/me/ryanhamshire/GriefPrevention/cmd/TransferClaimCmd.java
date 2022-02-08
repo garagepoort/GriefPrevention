@@ -8,7 +8,9 @@ import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
+import me.ryanhamshire.GriefPrevention.NoTransferException;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
@@ -21,12 +23,12 @@ import java.util.UUID;
 public class TransferClaimCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    private final ClaimService claimService;
 
-    public TransferClaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public TransferClaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        this.claimService = claimService;
     }
 
     @Override
@@ -36,15 +38,15 @@ public class TransferClaimCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
 
             //which claim is the user in?
-            Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, null);
+            Claim claim = this.claimService.getClaimAt(player.getLocation(), true, null);
             if (claim == null) {
-                messageService.sendMessage(player, TextMode.Instr, Messages.TransferClaimMissing);
+                MessageService.sendMessage(player, TextMode.Instr, Messages.TransferClaimMissing);
                 return;
             }
 
             //check additional permission for admin claims
             if (claim.isAdminClaim() && !player.hasPermission("griefprevention.adminclaims")) {
-                messageService.sendMessage(player, TextMode.Err, Messages.TransferClaimPermission);
+                MessageService.sendMessage(player, TextMode.Err, Messages.TransferClaimPermission);
                 return;
             }
 
@@ -54,7 +56,7 @@ public class TransferClaimCmd extends AbstractCmd {
             if (args.length > 0) {
                 OfflinePlayer targetPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
                 if (targetPlayer == null) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                    MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return;
                 }
                 newOwnerID = targetPlayer.getUniqueId();
@@ -63,14 +65,14 @@ public class TransferClaimCmd extends AbstractCmd {
 
             //change ownerhsip
             try {
-                this.dataStore.changeClaimOwner(claim, newOwnerID);
-            } catch (DataStore.NoTransferException e) {
-                messageService.sendMessage(player, TextMode.Instr, Messages.TransferTopLevel);
+                this.claimService.changeClaimOwner(claim, newOwnerID);
+            } catch (NoTransferException e) {
+                MessageService.sendMessage(player, TextMode.Instr, Messages.TransferTopLevel);
                 return;
             }
 
             //confirm
-            messageService.sendMessage(player, TextMode.Success, Messages.TransferSuccess);
+            MessageService.sendMessage(player, TextMode.Success, Messages.TransferSuccess);
             GriefPrevention.AddLogEntry(player.getName() + " transferred a claim at " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " to " + ownerName + ".", CustomLogEntryTypes.AdminActivity);
         });
 

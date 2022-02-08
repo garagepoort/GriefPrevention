@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import org.bukkit.entity.Player;
 
 import java.util.function.Supplier;
@@ -27,27 +28,32 @@ import java.util.function.Supplier;
 class SiegeCheckupTask implements Runnable
 {
     private final SiegeData siegeData;
+    private final ClaimService claimService;
+    private final DataStore dataStore;
+    private final SiegeService siegeService;
 
-    public SiegeCheckupTask(SiegeData siegeData)
+    public SiegeCheckupTask(SiegeData siegeData, ClaimService claimService, DataStore dataStore, SiegeService siegeService)
     {
         this.siegeData = siegeData;
+        this.claimService = claimService;
+        this.dataStore = dataStore;
+        this.siegeService = siegeService;
     }
 
     @Override
     public void run()
     {
-        DataStore dataStore = GriefPrevention.instance.dataStore;
         Player defender = this.siegeData.defender;
         Player attacker = this.siegeData.attacker;
 
         //where is the defender?
-        Claim defenderClaim = dataStore.getClaimAt(defender.getLocation(), false, null);
+        Claim defenderClaim = claimService.getClaimAt(defender.getLocation(), false, null);
 
         //if this is a new claim and he has some permission there, extend the siege to include it
         if (defenderClaim != null)
         {
-            Supplier<String> noAccessReason = defenderClaim.checkPermission(defender, ClaimPermission.Access, null);
-            if (defenderClaim.canSiege(defender) && noAccessReason == null)
+            Supplier<String> noAccessReason = claimService.checkPermission(defenderClaim, defender, ClaimPermission.Access, null);
+            if (claimService.canSiege(defenderClaim, defender) && noAccessReason == null)
             {
                 this.siegeData.claims.add(defenderClaim);
                 defenderClaim.siegeData = this.siegeData;
@@ -67,13 +73,13 @@ class SiegeCheckupTask implements Runnable
         //otherwise attacker wins if the defender runs away
         else if (attackerRemains && !defenderRemains)
         {
-            dataStore.endSiege(this.siegeData, attacker.getName(), defender.getName(), null);
+            siegeService.endSiege(this.siegeData, attacker.getName(), defender.getName(), null);
         }
 
         //or defender wins if the attacker leaves
         else if (!attackerRemains && defenderRemains)
         {
-            dataStore.endSiege(this.siegeData, defender.getName(), attacker.getName(), null);
+            siegeService.endSiege(this.siegeData, defender.getName(), attacker.getName(), null);
         }
 
         //if they both left, but are still close together, the battle continues (check again later)
@@ -85,7 +91,7 @@ class SiegeCheckupTask implements Runnable
         //otherwise they both left and aren't close to each other, so call the attacker the winner (defender escaped, possibly after a chase)
         else
         {
-            dataStore.endSiege(this.siegeData, attacker.getName(), defender.getName(), null);
+            siegeService.endSiege(this.siegeData, attacker.getName(), defender.getName(), null);
         }
     }
 

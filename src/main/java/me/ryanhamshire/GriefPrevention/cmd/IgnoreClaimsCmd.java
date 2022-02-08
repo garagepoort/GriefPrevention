@@ -16,12 +16,12 @@ import org.bukkit.entity.Player;
 public class IgnoreClaimsCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public IgnoreClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public IgnoreClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -35,9 +35,9 @@ public class IgnoreClaimsCmd extends AbstractCmd {
 
             //toggle ignore claims mode on or off
             if (!playerData.ignoreClaims) {
-                messageService.sendMessage(player, TextMode.Success, Messages.RespectingClaims);
+                MessageService.sendMessage(player, TextMode.Success, Messages.RespectingClaims);
             } else {
-                messageService.sendMessage(player, TextMode.Success, Messages.IgnoringClaims);
+                MessageService.sendMessage(player, TextMode.Success, Messages.IgnoringClaims);
             }
         });
 

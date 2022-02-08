@@ -23,17 +23,14 @@ import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.BanList;
 import org.bukkit.BanList.Type;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
@@ -94,20 +91,6 @@ public class GriefPrevention extends TubingPlugin {
 
         AddLogEntry("Finished loading configuration.");
 
-        //unless claim block accrual is disabled, start the recurring per 10 minute event to give claim blocks to online players
-        //20L ~ 1 second
-        if (ConfigLoader.config_claims_blocksAccruedPerHour_default > 0) {
-            DeliverClaimBlocksTask task = new DeliverClaimBlocksTask(null, this);
-            this.getServer().getScheduler().scheduleSyncRepeatingTask(this, task, 20L * 60 * 10, 20L * 60 * 10);
-        }
-
-        //start the recurring cleanup event for entities in creative worlds
-        EntityCleanupTask task = new EntityCleanupTask(0);
-        this.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task, 20L * 60 * 2);
-
-        //register for events
-        PluginManager pluginManager = this.getServer().getPluginManager();
-
         //cache offline players
         OfflinePlayer[] offlinePlayers = this.getServer().getOfflinePlayers();
         CacheOfflinePlayerNamesThread namesThread = new CacheOfflinePlayerNamesThread(offlinePlayers, this.playerNameToIDMap);
@@ -115,12 +98,6 @@ public class GriefPrevention extends TubingPlugin {
         namesThread.start();
 
         AddLogEntry("Boot finished.");
-//
-//        try
-//        {
-//            new MetricsHandler(this, dataMode);
-//        }
-//        catch (Throwable ignored) {}
     }
 
     public enum IgnoreMode {None, StandardIgnore, AdminIgnore}
@@ -252,48 +229,7 @@ public class GriefPrevention extends TubingPlugin {
         return mode != null && mode != ClaimsMode.Disabled;
     }
 
-    //restores nature in multiple chunks, as described by a claim instance
-    //this restores all chunks which have ANY number of claim blocks from this claim in them
-    //if the claim is still active (in the data store), then the claimed blocks will not be changed (only the area bordering the claim)
-    public void restoreClaim(Claim claim, long delayInTicks) {
-        //admin claims aren't automatically cleaned up when deleted or abandoned
-        if (claim.isAdminClaim()) return;
-
-        //it's too expensive to do this for huge claims
-        if (claim.getArea() > 10000) return;
-
-        ArrayList<Chunk> chunks = claim.getChunks();
-        for (Chunk chunk : chunks) {
-            this.restoreChunk(chunk, this.getSeaLevel(chunk.getWorld()) - 15, false, delayInTicks, null);
-        }
-    }
-
-    public void restoreChunk(Chunk chunk, int miny, boolean aggressiveMode, long delayInTicks, Player playerReceivingVisualization) {
-        //build a snapshot of this chunk, including 1 block boundary outside of the chunk all the way around
-        int maxHeight = chunk.getWorld().getMaxHeight();
-        BlockSnapshot[][][] snapshots = new BlockSnapshot[18][maxHeight][18];
-        Block startBlock = chunk.getBlock(0, 0, 0);
-        Location startLocation = new Location(chunk.getWorld(), startBlock.getX() - 1, 0, startBlock.getZ() - 1);
-        for (int x = 0; x < snapshots.length; x++) {
-            for (int z = 0; z < snapshots[0][0].length; z++) {
-                for (int y = 0; y < snapshots[0].length; y++) {
-                    Block block = chunk.getWorld().getBlockAt(startLocation.getBlockX() + x, startLocation.getBlockY() + y, startLocation.getBlockZ() + z);
-                    snapshots[x][y][z] = new BlockSnapshot(block.getLocation(), block.getType(), block.getBlockData());
-                }
-            }
-        }
-
-        //create task to process those data in another thread
-        Location lesserBoundaryCorner = chunk.getBlock(0, 0, 0).getLocation();
-        Location greaterBoundaryCorner = chunk.getBlock(15, 0, 15).getLocation();
-
-        //create task
-        //when done processing, this task will create a main thread task to actually update the world with processing results
-        RestoreNatureProcessingTask task = new RestoreNatureProcessingTask(snapshots, miny, chunk.getWorld().getEnvironment(), lesserBoundaryCorner.getBlock().getBiome(), lesserBoundaryCorner, greaterBoundaryCorner, this.getSeaLevel(chunk.getWorld()), aggressiveMode, ConfigLoader.creativeRulesApply(lesserBoundaryCorner), playerReceivingVisualization);
-        GriefPrevention.instance.getServer().getScheduler().runTaskLaterAsynchronously(GriefPrevention.instance, task, delayInTicks);
-    }
-
-    public int getSeaLevel(World world) {
+    public static int getSeaLevel(World world) {
         Integer overrideValue = ConfigLoader.config_seaLevelOverride.get(world.getName());
         if (overrideValue == null || overrideValue == -1) {
             return world.getSeaLevel();

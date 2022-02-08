@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import org.bukkit.entity.Player;
 
 import java.util.Collection;
@@ -27,10 +28,12 @@ class SecureClaimTask implements Runnable
 {
     private final SiegeData siegeData;
     private final PlayerRescueService playerRescueService;
+    private final ClaimService claimService;
 
-    public SecureClaimTask(SiegeData siegeData)
+    public SecureClaimTask(SiegeData siegeData, ClaimService claimService)
     {
         this.siegeData = siegeData;
+        this.claimService = claimService;
         this.playerRescueService = GriefPrevention.get().getIocContainer().get(PlayerRescueService.class);
     }
 
@@ -49,9 +52,9 @@ class SecureClaimTask implements Runnable
             Collection<Player> onlinePlayers = (Collection<Player>) GriefPrevention.instance.getServer().getOnlinePlayers();
             for (Player player : onlinePlayers)
             {
-                if (claim.contains(player.getLocation(), false, false) && claim.checkPermission(player, ClaimPermission.Access, null) != null)
+                if (claim.contains(player.getLocation(), false, false) && claimService.checkPermission(claim, player, ClaimPermission.Access, null) != null)
                 {
-                    messageService.sendMessage(player, TextMode.Err, Messages.SiegeDoorsLockedEjection);
+                    MessageService.sendMessage(player, TextMode.Err, Messages.SiegeDoorsLockedEjection);
                     playerRescueService.ejectPlayer(player);
                 }
             }

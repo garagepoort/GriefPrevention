@@ -17,12 +17,12 @@ import org.bukkit.entity.Player;
 public class RestoreNatureFillCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public RestoreNatureFillCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public RestoreNatureFillCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -44,7 +44,7 @@ public class RestoreNatureFillCmd extends AbstractCmd {
             }
 
             if (playerData.fillRadius < 0) playerData.fillRadius = 2;
-            messageService.sendMessage(player, TextMode.Success, Messages.FillModeActive, String.valueOf(playerData.fillRadius));
+            MessageService.sendMessage(player, TextMode.Success, Messages.FillModeActive, String.valueOf(playerData.fillRadius));
         });
 
         return true;

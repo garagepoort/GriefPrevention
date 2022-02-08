@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -37,10 +38,14 @@ class EntityCleanupTask implements Runnable
 {
     //where to start cleaning in the list of entities
     private final double percentageStart;
+    private final DataStore dataStore;
+    private final ClaimService claimService;
 
-    public EntityCleanupTask(double percentageStart)
+    public EntityCleanupTask(double percentageStart, DataStore dataStore, ClaimService claimService)
     {
         this.percentageStart = percentageStart;
+        this.dataStore = dataStore;
+        this.claimService = claimService;
     }
 
     @Override
@@ -100,7 +105,7 @@ class EntityCleanupTask implements Runnable
                 //all non-player entities must be in claims
                 else if (!(entity instanceof Player))
                 {
-                    Claim claim = GriefPrevention.instance.dataStore.getClaimAt(entity.getLocation(), false, cachedClaim);
+                    Claim claim = claimService.getClaimAt(entity.getLocation(), false, cachedClaim);
                     if (claim != null)
                     {
                         cachedClaim = claim;
@@ -120,7 +125,7 @@ class EntityCleanupTask implements Runnable
         }
 
         //starting and stopping point.  each execution of the task scans 5% of the server's claims
-        List<Claim> claims = GriefPrevention.instance.dataStore.claims;
+        List<Claim> claims = claimService.getClaims();
         int j = (int) (claims.size() * this.percentageStart);
         int k = (int) (claims.size() * (this.percentageStart + .05));
         for (; j < claims.size() && j < k; j++)
@@ -142,7 +147,7 @@ class EntityCleanupTask implements Runnable
             nextRunPercentageStart = 0;
         }
 
-        EntityCleanupTask task = new EntityCleanupTask(nextRunPercentageStart);
+        EntityCleanupTask task = new EntityCleanupTask(nextRunPercentageStart, dataStore, claimService);
         GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task, 20L * 60 * 1);
     }
 }

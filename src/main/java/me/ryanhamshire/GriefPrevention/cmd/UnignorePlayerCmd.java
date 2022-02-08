@@ -18,12 +18,12 @@ import org.bukkit.entity.Player;
 public class UnignorePlayerCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public UnignorePlayerCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public UnignorePlayerCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -34,20 +34,20 @@ public class UnignorePlayerCmd extends AbstractCmd {
         //validate target player
         OfflinePlayer targetPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
         if (targetPlayer == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+            MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
             return true;
         }
         bukkitUtils.runTaskAsync(sender, () -> {//requires target player name
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Boolean ignoreStatus = playerData.ignoredPlayers.get(targetPlayer.getUniqueId());
             if (ignoreStatus == null || ignoreStatus == true) {
-                messageService.sendMessage(player, TextMode.Err, Messages.NotIgnoringPlayer);
+                MessageService.sendMessage(player, TextMode.Err, Messages.NotIgnoringPlayer);
                 return;
             }
 
             this.setIgnoreStatus(player, targetPlayer, GriefPrevention.IgnoreMode.None);
 
-            messageService.sendMessage(player, TextMode.Success, Messages.UnIgnoreConfirmation);
+            MessageService.sendMessage(player, TextMode.Success, Messages.UnIgnoreConfirmation);
 
         });
 

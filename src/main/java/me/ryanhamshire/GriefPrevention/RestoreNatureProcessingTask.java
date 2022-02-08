@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -35,7 +36,7 @@ import java.util.Set;
 
 //non-main-thread task which processes world data to repair the unnatural
 //after processing is complete, creates a main thread task to make the necessary changes to the world
-class RestoreNatureProcessingTask implements Runnable
+public class RestoreNatureProcessingTask implements Runnable
 {
 
     // Definitions of biomes with particularly dense log distribution. These biomes will not have logs reduced.
@@ -73,16 +74,19 @@ class RestoreNatureProcessingTask implements Runnable
     private final boolean creativeMode;
     private final int seaLevel;
     private final boolean aggressiveMode;
+    private final DataStore dataStore;
 
     //two lists of materials
     private final Set<Material> notAllowedToHang;    //natural blocks which don't naturally hang in their air
     private final Set<Material> playerBlocks;        //a "complete" list of player-placed blocks.  MUST BE MAINTAINED as patches introduce more
+    private final ClaimService claimService;
 
-
-    public RestoreNatureProcessingTask(BlockSnapshot[][][] snapshots, int miny, Environment environment, Biome biome, Location lesserBoundaryCorner, Location greaterBoundaryCorner, int seaLevel, boolean aggressiveMode, boolean creativeMode, Player player)
+    public RestoreNatureProcessingTask(BlockSnapshot[][][] snapshots, int miny, Environment environment, Biome biome, Location lesserBoundaryCorner, Location greaterBoundaryCorner, int seaLevel, boolean aggressiveMode, boolean creativeMode, Player player, DataStore dataStore, ClaimService claimService)
     {
         this.snapshots = snapshots;
         this.miny = miny;
+        this.dataStore = dataStore;
+        this.claimService = claimService;
         if (this.miny < 0) this.miny = 0;
         this.environment = environment;
         this.lesserBoundaryCorner = lesserBoundaryCorner;
@@ -186,7 +190,7 @@ class RestoreNatureProcessingTask implements Runnable
         ///this.removePlayerLeaves();
 
         //schedule main thread task to apply the result to the world
-        RestoreNatureExecutionTask task = new RestoreNatureExecutionTask(this.snapshots, this.miny, this.lesserBoundaryCorner, this.greaterBoundaryCorner, this.player);
+        RestoreNatureExecutionTask task = new RestoreNatureExecutionTask(this.snapshots, this.miny, this.lesserBoundaryCorner, this.greaterBoundaryCorner, this.player, dataStore, claimService);
         GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task);
     }
 

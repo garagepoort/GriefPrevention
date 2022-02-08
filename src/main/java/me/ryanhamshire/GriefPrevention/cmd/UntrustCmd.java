@@ -8,8 +8,9 @@ import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
-import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.events.TrustChangedEvent;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.Bukkit;
@@ -22,12 +23,15 @@ import org.bukkit.entity.Player;
 public class UntrustCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    private final ClaimService claimService;
+    private final ClaimRepository claimRepository;
 
-    public UntrustCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public UntrustCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimRepository claimRepository) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+
+        this.claimService = claimService;
+        this.claimRepository = claimRepository;
     }
 
     @Override
@@ -37,16 +41,16 @@ public class UntrustCmd extends AbstractCmd {
         //requires exactly one parameter, the other player's name
         if (args.length != 1) return false;
 
-        Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
+        Claim claim = this.claimService.getClaimAt(player.getLocation(), true /*ignore height*/, null);
 
         //determine whether a single player or clearing permissions entirely
         boolean clearPermissions = false;
         OfflinePlayer otherPlayer = null;
         if (args[0].equals("all")) {
-            if (claim == null || claim.checkPermission(player, ClaimPermission.Edit, null) == null) {
+            if (claim == null || claimService.checkPermission(claim, player, ClaimPermission.Edit, null) == null) {
                 clearPermissions = true;
             } else {
-                messageService.sendMessage(player, TextMode.Err, Messages.ClearPermsOwnerOnly);
+                MessageService.sendMessage(player, TextMode.Err, Messages.ClearPermsOwnerOnly);
                 return true;
             }
         } else {
@@ -58,7 +62,7 @@ public class UntrustCmd extends AbstractCmd {
                     if (args[0].contains(".")) {
                         args[0] = "[" + args[0] + "]";
                     } else {
-                        messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                        MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                         return true;
                     }
                 }
@@ -71,15 +75,13 @@ public class UntrustCmd extends AbstractCmd {
 
         //if no claim here, apply changes to all his claims
         if (claim == null) {
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-
             String idToDrop = args[0];
             if (otherPlayer != null) {
                 idToDrop = otherPlayer.getUniqueId().toString();
             }
 
             //calling event
-            TrustChangedEvent event = new TrustChangedEvent(player, playerData.getClaims(), null, false, idToDrop);
+            TrustChangedEvent event = new TrustChangedEvent(player, claimService.getClaims(player.getUniqueId(), player.getName()), null, false, idToDrop);
             Bukkit.getPluginManager().callEvent(event);
 
             if (event.isCancelled()) {
@@ -102,7 +104,7 @@ public class UntrustCmd extends AbstractCmd {
                 }
 
                 //save changes
-                this.dataStore.saveClaim(claim);
+                this.claimRepository.saveClaim(claim);
             }
 
             //beautify for output
@@ -112,21 +114,21 @@ public class UntrustCmd extends AbstractCmd {
 
             //confirmation message
             if (!clearPermissions) {
-                messageService.sendMessage(player, TextMode.Success, Messages.UntrustIndividualAllClaims, args[0]);
+                MessageService.sendMessage(player, TextMode.Success, Messages.UntrustIndividualAllClaims, args[0]);
             } else {
-                messageService.sendMessage(player, TextMode.Success, Messages.UntrustEveryoneAllClaims);
+                MessageService.sendMessage(player, TextMode.Success, Messages.UntrustEveryoneAllClaims);
             }
         }
 
         //otherwise, apply changes to only this claim
-        else if (claim.checkPermission(player, ClaimPermission.Manage, null) != null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
+        else if (claimService.checkPermission(claim, player, ClaimPermission.Manage, null) != null) {
+            MessageService.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
         } else {
             //if clearing all
             if (clearPermissions) {
                 //requires owner
-                if (claim.checkPermission(player, ClaimPermission.Edit, null) != null) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.UntrustAllOwnerOnly);
+                if (claimService.checkPermission(claim, player, ClaimPermission.Edit, null) != null) {
+                    MessageService.sendMessage(player, TextMode.Err, Messages.UntrustAllOwnerOnly);
                     return true;
                 }
 
@@ -139,7 +141,7 @@ public class UntrustCmd extends AbstractCmd {
                 }
 
                 event.getClaims().forEach(Claim::clearPermissions);
-                messageService.sendMessage(player, TextMode.Success, Messages.ClearPermissionsOneClaim);
+                MessageService.sendMessage(player, TextMode.Success, Messages.ClearPermissionsOneClaim);
             }
 
             //otherwise individual permission drop
@@ -149,9 +151,9 @@ public class UntrustCmd extends AbstractCmd {
                     idToDrop = otherPlayer.getUniqueId().toString();
                 }
                 boolean targetIsManager = claim.managers.contains(idToDrop);
-                if (targetIsManager && claim.checkPermission(player, ClaimPermission.Edit, null) != null)  //only claim owners can untrust managers
+                if (targetIsManager && claimService.checkPermission(claim, player, ClaimPermission.Edit, null) != null)  //only claim owners can untrust managers
                 {
-                    messageService.sendMessage(player, TextMode.Err, Messages.ManagersDontUntrustManagers, claim.getOwnerName());
+                    MessageService.sendMessage(player, TextMode.Err, Messages.ManagersDontUntrustManagers, claim.getOwnerName());
                     return true;
                 } else {
                     //calling the event
@@ -169,11 +171,11 @@ public class UntrustCmd extends AbstractCmd {
                         args[0] = "the public";
                     }
 
-                    messageService.sendMessage(player, TextMode.Success, Messages.UntrustIndividualSingleClaim, args[0]);
+                    MessageService.sendMessage(player, TextMode.Success, Messages.UntrustIndividualSingleClaim, args[0]);
                 }
             }
 
-            this.dataStore.saveClaim(claim);
+            this.claimRepository.saveClaim(claim);
         }
 
         return true;

@@ -28,19 +28,19 @@ public class MessageService {
 
 
     //sends a color-coded message to a player
-    public void sendMessage(CommandSender player, ChatColor color, Messages messageID, String... args) {
+    public static void sendMessage(CommandSender player, ChatColor color, Messages messageID, String... args) {
         sendMessage(player, color, messageID, 0, args);
     }
 
     //sends a color-coded message to a player
-    public void sendMessage(CommandSender player, ChatColor color, Messages messageID, long delayInTicks, String... args)
+    public static void sendMessage(CommandSender player, ChatColor color, Messages messageID, long delayInTicks, String... args)
     {
         String message = getMessage(messageID, args);
         sendMessage(player, color, message, delayInTicks);
     }
 
     //sends a color-coded message to a player
-    public void sendMessage(CommandSender player, ChatColor color, String message) {
+    public static void sendMessage(CommandSender player, ChatColor color, String message) {
         if (message == null || message.length() == 0) return;
 
         if (player == null) {
@@ -50,7 +50,7 @@ public class MessageService {
         }
     }
 
-    public void sendMessage(CommandSender player, ChatColor color, String message, long delayInTicks) {
+    public static void sendMessage(CommandSender player, ChatColor color, String message, long delayInTicks) {
         SendPlayerMessageTask task = new SendPlayerMessageTask(player, color, message);
 
         //Only schedule if there should be a delay. Otherwise, send the message right now, else the message will appear out of order.

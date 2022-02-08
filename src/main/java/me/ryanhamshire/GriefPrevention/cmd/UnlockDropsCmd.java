@@ -17,12 +17,12 @@ import org.bukkit.entity.Player;
 public class UnlockDropsCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public UnlockDropsCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public UnlockDropsCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -35,15 +35,15 @@ public class UnlockDropsCmd extends AbstractCmd {
             if (player.hasPermission("griefprevention.unlockothersdrops") && args.length == 1) {
                 Player otherPlayer = Bukkit.getPlayer(args[0]);
                 if (otherPlayer == null) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                    MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return;
                 }
 
                 playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
-                messageService.sendMessage(player, TextMode.Success, Messages.DropUnlockOthersConfirmation, otherPlayer.getName());
+                MessageService.sendMessage(player, TextMode.Success, Messages.DropUnlockOthersConfirmation, otherPlayer.getName());
             } else {
                 playerData = this.dataStore.getPlayerData(player.getUniqueId());
-                messageService.sendMessage(player, TextMode.Success, Messages.DropUnlockConfirmation);
+                MessageService.sendMessage(player, TextMode.Success, Messages.DropUnlockConfirmation);
             }
 
             playerData.dropsAreUnlocked = true;

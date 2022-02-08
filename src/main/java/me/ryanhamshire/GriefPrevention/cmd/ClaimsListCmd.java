@@ -24,15 +24,15 @@ import java.util.Vector;
 public class ClaimsListCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
     private final GroupBonusBlocksService groupBonusBlocksService;
 
-    public ClaimsListCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService, ClaimService claimService, ClaimBlockService claimBlockService, GroupBonusBlocksService groupBonusBlocksService) {
+    public ClaimsListCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, GroupBonusBlocksService groupBonusBlocksService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
         this.groupBonusBlocksService = groupBonusBlocksService;
@@ -54,30 +54,30 @@ public class ClaimsListCmd extends AbstractCmd {
             else
                 return false;
         } else if (player != null && !player.hasPermission("griefprevention.claimslistother")) {
-            messageService.sendMessage(player, TextMode.Err, Messages.ClaimsListNoPermission);
+            MessageService.sendMessage(player, TextMode.Err, Messages.ClaimsListNoPermission);
             return true;
         } else {
             otherPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
             if (otherPlayer == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
-            Vector<Claim> claims = claimService.getClaims(otherPlayer);
-            messageService.sendMessage(player, TextMode.Instr, Messages.StartBlockMath,
+            Vector<Claim> claims = claimService.getClaims(otherPlayer.getUniqueId(), otherPlayer.getName());
+            MessageService.sendMessage(player, TextMode.Instr, Messages.StartBlockMath,
                 String.valueOf(claimBlockService.recalculateAccruedClaimBlocks(playerData)),
                 String.valueOf((playerData.getBonusClaimBlocks() + groupBonusBlocksService.getGroupBonusBlocks(otherPlayer.getUniqueId()))),
                 String.valueOf((claimBlockService.recalculateAccruedClaimBlocks(playerData) + playerData.getBonusClaimBlocks() + groupBonusBlocksService.getGroupBonusBlocks(otherPlayer.getUniqueId()))));
             if (claims.size() > 0) {
-                messageService.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
+                MessageService.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
                 for (Claim claim : claims) {
-                    messageService.sendMessage(player, TextMode.Instr, GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + MessageService.getMessage(Messages.ContinueBlockMath, String.valueOf(claim.getArea())));
+                    MessageService.sendMessage(player, TextMode.Instr, GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + MessageService.getMessage(Messages.ContinueBlockMath, String.valueOf(claim.getArea())));
                 }
 
-                messageService.sendMessage(player, TextMode.Instr, Messages.EndBlockMath, String.valueOf(claimBlockService.getRemainingClaimBlocks(playerData, claims)));
+                MessageService.sendMessage(player, TextMode.Instr, Messages.EndBlockMath, String.valueOf(claimBlockService.getRemainingClaimBlocks(playerData, claims)));
             }
 
             //drop the data we just loaded, if the player isn't online

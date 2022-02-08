@@ -18,12 +18,12 @@ import org.bukkit.entity.Player;
 public class SoftMuteCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public SoftMuteCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public SoftMuteCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -36,13 +36,13 @@ public class SoftMuteCmd extends AbstractCmd {
         //find the specified player
         OfflinePlayer targetPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
         if (targetPlayer == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+            MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
             return true;
         }
         bukkitUtils.runTaskAsync(sender, () -> {
             boolean isMuted = this.dataStore.toggleSoftMute(targetPlayer.getUniqueId());
             if (isMuted) {
-                messageService.sendMessage(player, TextMode.Success, Messages.SoftMuted, targetPlayer.getName());
+                MessageService.sendMessage(player, TextMode.Success, Messages.SoftMuted, targetPlayer.getName());
                 String executorName = "console";
                 if (player != null) {
                     executorName = player.getName();
@@ -50,7 +50,7 @@ public class SoftMuteCmd extends AbstractCmd {
 
                 GriefPrevention.AddLogEntry(executorName + " muted " + targetPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity, true);
             } else {
-                messageService.sendMessage(player, TextMode.Success, Messages.UnSoftMuted, targetPlayer.getName());
+                MessageService.sendMessage(player, TextMode.Success, Messages.UnSoftMuted, targetPlayer.getName());
             }
         });
 

@@ -1,6 +1,7 @@
 package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.IocBean;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
@@ -9,10 +10,10 @@ import org.bukkit.entity.Player;
 @IocBean
 public class PlayerRescueService {
 
-    private final DataStore dataStore;
+    private final ClaimService claimService;
 
-    public PlayerRescueService(DataStore dataStore) {
-        this.dataStore = dataStore;
+    public PlayerRescueService(ClaimService claimService) {
+        this.claimService = claimService;
     }
 
     //moves a player from the claim he's in to a nearby wilderness location
@@ -21,7 +22,7 @@ public class PlayerRescueService {
         Location candidateLocation = player.getLocation();
         while (true) {
             Claim claim = null;
-            claim = dataStore.getClaimAt(candidateLocation, false, null);
+            claim = claimService.getClaimAt(candidateLocation, false, null);
 
             //if there's a claim here, keep looking
             if (claim != null) {

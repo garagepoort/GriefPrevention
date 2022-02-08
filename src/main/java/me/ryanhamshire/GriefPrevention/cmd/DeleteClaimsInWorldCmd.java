@@ -3,10 +3,11 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
+import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -16,18 +17,18 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("deleteclaimsinworld")
 public class DeleteClaimsInWorldCmd extends AbstractCmd {
-    private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
+    private final ClaimService claimService;
 
-    public DeleteClaimsInWorldCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public DeleteClaimsInWorldCmd(BukkitUtils bukkitUtils, ClaimService claimService) {
         this.bukkitUtils = bukkitUtils;
+        this.claimService = claimService;
     }
 
     @Override
     protected boolean executeCmd(CommandSender sender, String alias, String[] args) {
         if (sender instanceof Player) {
-            messageService.sendMessage(sender, TextMode.Err, Messages.ConsoleOnlyCommand);
+            MessageService.sendMessage(sender, TextMode.Err, Messages.ConsoleOnlyCommand);
             return true;
         }
 
@@ -37,11 +38,11 @@ public class DeleteClaimsInWorldCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
             World world = Bukkit.getServer().getWorld(args[0]);
             if (world == null) {
-                messageService.sendMessage(sender, TextMode.Err, Messages.WorldNotFound);
+                MessageService.sendMessage(sender, TextMode.Err, Messages.WorldNotFound);
                 return;
             }
 
-            this.dataStore.deleteClaimsInWorld(world, true);
+            this.claimService.deleteClaimsInWorld(world, true);
             GriefPrevention.AddLogEntry("Deleted all claims in world: " + world.getName() + ".", CustomLogEntryTypes.AdminActivity);
         });
 

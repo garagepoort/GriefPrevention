@@ -20,10 +20,12 @@ package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
+import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.events.PreventPvPEvent;
 import me.ryanhamshire.GriefPrevention.events.ProtectDeathDropsEvent;
+import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -115,13 +117,18 @@ public class EntityEventHandler implements Listener
     private final DataStore dataStore;
     private final NamespacedKey luredByPlayer;
     private final ClaimService claimService;
-    private final MessageService messageService;
+    private final SiegeService siegeService;
+    private final BukkitUtils bukkitUtils;
+    private final ClaimRepository claimRepository;
 
-    public EntityEventHandler(DataStore dataStore, ClaimService claimService, MessageService messageService)
+    public EntityEventHandler(DataStore dataStore, ClaimService claimService, SiegeService siegeService, BukkitUtils bukkitUtils, ClaimRepository claimRepository)
     {
         this.dataStore = dataStore;
         this.claimService = claimService;
-        this.messageService = messageService;
+        this.siegeService = siegeService;
+        this.bukkitUtils = bukkitUtils;
+        this.claimRepository = claimRepository;
+
         luredByPlayer = new NamespacedKey(GriefPrevention.get(), "lured_by_player");
     }
 
@@ -173,7 +180,7 @@ public class EntityEventHandler implements Listener
 
         else if (event.getEntityType() == EntityType.WITHER)
         {
-            Claim claim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, null);
+            Claim claim = this.claimService.getClaimAt(event.getBlock().getLocation(), false, null);
             if (claim == null || !claim.areExplosivesAllowed || !ConfigLoader.config_blockClaimExplosions)
             {
                 event.setCancelled(true);
@@ -246,7 +253,7 @@ public class EntityEventHandler implements Listener
                     }
 
                     //in other worlds, if landing in land claim, only allow if source was also in the land claim
-                    Claim claim = this.dataStore.getClaimAt(newLocation, false, null);
+                    Claim claim = this.claimService.getClaimAt(newLocation, false, null);
                     if (claim != null && !claim.contains(originalLocation, false, false))
                     {
                         //when not allowed, drop as item instead of forming a block
@@ -272,7 +279,7 @@ public class EntityEventHandler implements Listener
     private void handleProjectileChangeBlock(EntityChangeBlockEvent event, Projectile projectile)
     {
         Block block = event.getBlock();
-        Claim claim = this.dataStore.getClaimAt(block.getLocation(), false, null);
+        Claim claim = this.claimService.getClaimAt(block.getLocation(), false, null);
 
         // Wilderness rules
         if (claim == null)
@@ -300,14 +307,14 @@ public class EntityEventHandler implements Listener
 
         if (shooter instanceof Player)
         {
-            Supplier<String> denial = claim.checkPermission((Player) shooter, ClaimPermission.Build, event);
+            Supplier<String> denial = claimService.checkPermission(claim, (Player) shooter, ClaimPermission.Build, event);
 
             // If the player cannot place the material being broken, disallow.
             if (denial != null)
             {
                 // Unlike entities where arrows rebound and may cause multiple alerts,
                 // projectiles lodged in blocks do not continuously re-trigger events.
-                messageService.sendMessage((Player) shooter, TextMode.Err, denial.get());
+                MessageService.sendMessage((Player) shooter, TextMode.Err, denial.get());
                 event.setCancelled(true);
             }
 
@@ -325,7 +332,7 @@ public class EntityEventHandler implements Listener
     private boolean isBlockSourceInClaim(ProjectileSource projectileSource, Claim claim)
     {
         return projectileSource instanceof BlockProjectileSource &&
-                dataStore.getClaimAt(((BlockProjectileSource) projectileSource).getBlock().getLocation(), false, claim) == claim;
+                claimService.getClaimAt(((BlockProjectileSource) projectileSource).getBlock().getLocation(), false, claim) == claim;
     }
 
     //Used by "sand cannon" fix to ignore fallingblocks that fell through End Portals
@@ -428,7 +435,7 @@ public class EntityEventHandler implements Listener
             if (block.getType() == Material.AIR) continue;
 
             //is it in a land claim?
-            Claim claim = this.dataStore.getClaimAt(block.getLocation(), false, cachedClaim);
+            Claim claim = this.claimService.getClaimAt(block.getLocation(), false, cachedClaim);
             if (claim != null)
             {
                 cachedClaim = claim;
@@ -546,7 +553,7 @@ public class EntityEventHandler implements Listener
         }
 
         //otherwise, just apply the limit on total entities per claim (and no spawning in the wilderness!)
-        Claim claim = this.dataStore.getClaimAt(event.getLocation(), false, null);
+        Claim claim = this.claimService.getClaimAt(event.getLocation(), false, null);
         if (claim == null || claim.allowMoreEntities(true) != null)
         {
             event.setCancelled(true);
@@ -581,8 +588,7 @@ public class EntityEventHandler implements Listener
         //if involved in a siege
         if (playerData.siegeData != null)
         {
-            //end it, with the dieing player being the loser
-            this.dataStore.endSiege(playerData.siegeData, null, player.getName(), event.getDrops());
+            this.siegeService.endSiege(playerData.siegeData, null, player.getName(), event.getDrops());
         }
 
         //FEATURE: lock dropped items to player who dropped them
@@ -594,7 +600,7 @@ public class EntityEventHandler implements Listener
         if ((isPvPWorld && ConfigLoader.config_lockDeathDropsInPvpWorlds) ||
                 (!isPvPWorld && ConfigLoader.config_lockDeathDropsInNonPvpWorlds))
         {
-            Claim claim = this.dataStore.getClaimAt(player.getLocation(), false, playerData.lastClaim);
+            Claim claim = this.claimService.getClaimAt(player.getLocation(), false, playerData.lastClaim);
             ProtectDeathDropsEvent protectionEvent = new ProtectDeathDropsEvent(claim);
             Bukkit.getPluginManager().callEvent(protectionEvent);
             if (!protectionEvent.isCancelled())
@@ -635,7 +641,7 @@ public class EntityEventHandler implements Listener
         if (event.getEntity().getType() == EntityType.ENDERMAN)
         {
             //and the block is claimed
-            if (this.dataStore.getClaimAt(event.getBlock().getLocation(), false, null) != null)
+            if (this.claimService.getClaimAt(event.getBlock().getLocation(), false, null) != null)
             {
                 //he doesn't get to steal it
                 event.setCancelled(true);
@@ -687,7 +693,7 @@ public class EntityEventHandler implements Listener
         if (noBuildReason != null)
         {
             event.setCancelled(true);
-            messageService.sendMessage(playerRemover, TextMode.Err, noBuildReason);
+            MessageService.sendMessage(playerRemover, TextMode.Err, noBuildReason);
         }
     }
 
@@ -705,7 +711,7 @@ public class EntityEventHandler implements Listener
         if (noBuildReason != null)
         {
             event.setCancelled(true);
-            messageService.sendMessage(event.getPlayer(), TextMode.Err, noBuildReason);
+            MessageService.sendMessage(event.getPlayer(), TextMode.Err, noBuildReason);
             return;
         }
 
@@ -713,13 +719,13 @@ public class EntityEventHandler implements Listener
         else if (ConfigLoader.creativeRulesApply(event.getEntity().getLocation()))
         {
             PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
-            Claim claim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, playerData.lastClaim);
+            Claim claim = this.claimService.getClaimAt(event.getBlock().getLocation(), false, playerData.lastClaim);
             if (claim == null) return;
 
             String noEntitiesReason = claim.allowMoreEntities(false);
             if (noEntitiesReason != null)
             {
-                messageService.sendMessage(event.getPlayer(), TextMode.Err, noEntitiesReason);
+                MessageService.sendMessage(event.getPlayer(), TextMode.Err, noEntitiesReason);
                 event.setCancelled(true);
                 return;
             }
@@ -890,7 +896,7 @@ public class EntityEventHandler implements Listener
                 //case 2: in a pvp safe zone
                 else
                 {
-                    Claim damagedClaim = dataStore.getClaimAt(damaged.getLocation(), false, damagedData.lastClaim);
+                    Claim damagedClaim = claimService.getClaimAt(damaged.getLocation(), false, damagedData.lastClaim);
                     if (damagedClaim != null)
                     {
                         damagedData.lastClaim = damagedClaim;
@@ -940,7 +946,7 @@ public class EntityEventHandler implements Listener
                     {
                         event.setCancelled(true);
                         if (sendErrorMessagesToPlayers)
-                            messageService.sendMessage(attacker, TextMode.Err, Messages.ThatPlayerPvPImmune);
+                            MessageService.sendMessage(attacker, TextMode.Err, Messages.ThatPlayerPvPImmune);
                         return;
                     }
 
@@ -948,7 +954,7 @@ public class EntityEventHandler implements Listener
                     {
                         event.setCancelled(true);
                         if (sendErrorMessagesToPlayers)
-                            messageService.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
+                            MessageService.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
                         return;
                     }
                 }
@@ -956,7 +962,7 @@ public class EntityEventHandler implements Listener
                 //FEATURE: prevent players from engaging in PvP combat inside land claims (when it's disabled)
                 if (ConfigLoader.config_pvp_noCombatInPlayerLandClaims || ConfigLoader.config_pvp_noCombatInAdminLandClaims)
                 {
-                    Claim attackerClaim = this.dataStore.getClaimAt(attacker.getLocation(), false, attackerData.lastClaim);
+                    Claim attackerClaim = this.claimService.getClaimAt(attacker.getLocation(), false, attackerData.lastClaim);
                     if (!attackerData.ignoreClaims)
                     {
                         if (attackerClaim != null && //ignore claims mode allows for pvp inside land claims
@@ -970,12 +976,12 @@ public class EntityEventHandler implements Listener
                             {
                                 event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
-                                    messageService.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
+                                    MessageService.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
                             }
                             return;
                         }
 
-                        Claim defenderClaim = this.dataStore.getClaimAt(defender.getLocation(), false, defenderData.lastClaim);
+                        Claim defenderClaim = this.claimService.getClaimAt(defender.getLocation(), false, defenderData.lastClaim);
                         if (defenderClaim != null &&
                                 !defenderData.inPvpCombat() &&
                                 GriefPrevention.get().claimIsPvPSafeZone(defenderClaim))
@@ -987,7 +993,7 @@ public class EntityEventHandler implements Listener
                             {
                                 event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
-                                    messageService.sendMessage(attacker, TextMode.Err, Messages.PlayerInPvPSafeZone);
+                                    MessageService.sendMessage(attacker, TextMode.Err, Messages.PlayerInPvPSafeZone);
                             }
                             return;
                         }
@@ -1018,7 +1024,7 @@ public class EntityEventHandler implements Listener
                         if (!defenderData.pvpImmune && !defenderData.inPvpCombat())
                         {
                             //if defender is not in a protected area
-                            Claim defenderClaim = this.dataStore.getClaimAt(defender.getLocation(), false, defenderData.lastClaim);
+                            Claim defenderClaim = this.claimService.getClaimAt(defender.getLocation(), false, defenderData.lastClaim);
                             if (defenderClaim != null &&
                                     !defenderData.inPvpCombat() &&
                                     GriefPrevention.get().claimIsPvPSafeZone(defenderClaim))
@@ -1063,7 +1069,7 @@ public class EntityEventHandler implements Listener
                     cachedClaim = playerData.lastClaim;
                 }
 
-                Claim claim = this.dataStore.getClaimAt(event.getEntity().getLocation(), false, cachedClaim);
+                Claim claim = this.claimService.getClaimAt(event.getEntity().getLocation(), false, cachedClaim);
 
                 //if it's claimed
                 if (claim != null)
@@ -1082,12 +1088,12 @@ public class EntityEventHandler implements Listener
                     }
 
                     //otherwise player must have container trust in the claim
-                    Supplier<String> failureReason = claim.checkPermission(attacker, ClaimPermission.Build, event);
+                    Supplier<String> failureReason = claimService.checkPermission(claim, attacker, ClaimPermission.Build, event);
                     if (failureReason != null)
                     {
                         event.setCancelled(true);
                         if (sendErrorMessagesToPlayers)
-                            messageService.sendMessage(attacker, TextMode.Err, failureReason.get());
+                            MessageService.sendMessage(attacker, TextMode.Err, failureReason.get());
                         return;
                     }
                 }
@@ -1124,7 +1130,7 @@ public class EntityEventHandler implements Listener
                                 if (attacker.hasPermission("griefprevention.ignoreclaims"))
                                     message += "  " + MessageService.getMessage(Messages.IgnoreClaimsAdvertisement);
                                 if (sendErrorMessagesToPlayers)
-                                    messageService.sendMessage(attacker, TextMode.Err, message);
+                                    MessageService.sendMessage(attacker, TextMode.Err, message);
                                 PreventPvPEvent pvpEvent = new PreventPvPEvent(new Claim(subEvent.getEntity().getLocation(), subEvent.getEntity().getLocation(), null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), null), attacker, tameable);
                                 Bukkit.getPluginManager().callEvent(pvpEvent);
                                 if (!pvpEvent.isCancelled())
@@ -1138,7 +1144,7 @@ public class EntityEventHandler implements Listener
                             {
                                 event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
-                                    messageService.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
+                                    MessageService.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
                                 return;
                             }
                             // disallow players attacking tamed wolves (dogs) unless under attack by said wolf
@@ -1156,7 +1162,7 @@ public class EntityEventHandler implements Listener
                                     if (attacker.hasPermission("griefprevention.ignoreclaims"))
                                         message += "  " + MessageService.getMessage(Messages.IgnoreClaimsAdvertisement);
                                     if (sendErrorMessagesToPlayers)
-                                        messageService.sendMessage(attacker, TextMode.Err, message);
+                                        MessageService.sendMessage(attacker, TextMode.Err, message);
                                     return;
                                 }
                             }
@@ -1189,7 +1195,7 @@ public class EntityEventHandler implements Listener
                     cachedClaim = playerData.lastClaim;
                 }
 
-                Claim claim = this.dataStore.getClaimAt(event.getEntity().getLocation(), false, cachedClaim);
+                Claim claim = this.claimService.getClaimAt(event.getEntity().getLocation(), false, cachedClaim);
 
                 //if it's claimed
                 if (claim != null)
@@ -1231,7 +1237,7 @@ public class EntityEventHandler implements Listener
                                 return message;
                             };
                         }
-                        Supplier<String> noContainersReason = claim.checkPermission(attacker, ClaimPermission.Inventory, event, override);
+                        Supplier<String> noContainersReason = claimService.checkPermission(claim, attacker, ClaimPermission.Inventory, event, override);
                         if (noContainersReason != null)
                         {
                             event.setCancelled(true);
@@ -1243,7 +1249,7 @@ public class EntityEventHandler implements Listener
 
                             if (sendErrorMessagesToPlayers)
                             {
-                                messageService.sendMessage(attacker, TextMode.Err, noContainersReason.get());
+                                MessageService.sendMessage(attacker, TextMode.Err, noContainersReason.get());
                             }
                             event.setCancelled(true);
                         }
@@ -1275,7 +1281,7 @@ public class EntityEventHandler implements Listener
         // but also doesn't disable self-damage.
         if (entity instanceof Player) return false;
 
-        Claim claim = dataStore.getClaimAt(entity.getLocation(), false, null);
+        Claim claim = claimService.getClaimAt(entity.getLocation(), false, null);
 
         // Only block explosion damage inside claims.
         if (claim == null) return false;
@@ -1428,7 +1434,7 @@ public class EntityEventHandler implements Listener
             cachedClaim = playerData.lastClaim;
         }
 
-        Claim claim = this.dataStore.getClaimAt(event.getVehicle().getLocation(), false, cachedClaim);
+        Claim claim = this.claimService.getClaimAt(event.getVehicle().getLocation(), false, cachedClaim);
 
         //if it's claimed
         if (claim != null)
@@ -1450,11 +1456,11 @@ public class EntityEventHandler implements Listener
                         message += "  " + MessageService.getMessage(Messages.IgnoreClaimsAdvertisement);
                     return message;
                 };
-                Supplier<String> noContainersReason = claim.checkPermission(attacker, ClaimPermission.Inventory, event, override);
+                Supplier<String> noContainersReason = claimService.checkPermission(claim, attacker, ClaimPermission.Inventory, event, override);
                 if (noContainersReason != null)
                 {
                     event.setCancelled(true);
-                    messageService.sendMessage(attacker, TextMode.Err, noContainersReason.get());
+                    MessageService.sendMessage(attacker, TextMode.Err, noContainersReason.get());
                 }
 
                 //cache claim for later
@@ -1500,7 +1506,7 @@ public class EntityEventHandler implements Listener
 
                     if (affected.getType() == EntityType.VILLAGER || affected instanceof Animals)
                     {
-                        Claim claim = this.dataStore.getClaimAt(affected.getLocation(), false, cachedClaim);
+                        Claim claim = this.claimService.getClaimAt(affected.getLocation(), false, cachedClaim);
                         if (claim != null)
                         {
                             cachedClaim = claim;
@@ -1518,13 +1524,13 @@ public class EntityEventHandler implements Listener
                             {
                                 // Source is a player. Determine if they have permission to access entities in the claim.
                                 Supplier<String> override = () -> MessageService.getMessage(Messages.NoDamageClaimedEntity, claim.getOwnerName());
-                                final Supplier<String> noContainersReason = claim.checkPermission(thrower, ClaimPermission.Inventory, event, override);
+                                final Supplier<String> noContainersReason = claimService.checkPermission(claim, thrower, ClaimPermission.Inventory, event, override);
                                 if (noContainersReason != null)
                                 {
                                     event.setIntensity(affected, 0);
                                     if (!messagedPlayer)
                                     {
-                                        messageService.sendMessage(thrower, TextMode.Err, noContainersReason.get());
+                                        MessageService.sendMessage(thrower, TextMode.Err, noContainersReason.get());
                                         messagedPlayer = true;
                                     }
                                 }
@@ -1555,7 +1561,7 @@ public class EntityEventHandler implements Listener
                     Player effectedPlayer = (Player) effected;
                     PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer.getUniqueId());
                     PlayerData attackerData = this.dataStore.getPlayerData(thrower.getUniqueId());
-                    Claim attackerClaim = this.dataStore.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
+                    Claim attackerClaim = this.claimService.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
                     if (attackerClaim != null && GriefPrevention.get().claimIsPvPSafeZone(attackerClaim))
                     {
                         attackerData.lastClaim = attackerClaim;
@@ -1566,14 +1572,14 @@ public class EntityEventHandler implements Listener
                             event.setIntensity(effected, 0);
                             if (!messagedPlayer)
                             {
-                                messageService.sendMessage(thrower, TextMode.Err, Messages.CantFightWhileImmune);
+                                MessageService.sendMessage(thrower, TextMode.Err, Messages.CantFightWhileImmune);
                                 messagedPlayer = true;
                             }
                         }
                         continue;
                     }
 
-                    Claim defenderClaim = this.dataStore.getClaimAt(effectedPlayer.getLocation(), false, defenderData.lastClaim);
+                    Claim defenderClaim = this.claimService.getClaimAt(effectedPlayer.getLocation(), false, defenderData.lastClaim);
                     if (defenderClaim != null && GriefPrevention.get().claimIsPvPSafeZone(defenderClaim))
                     {
                         defenderData.lastClaim = defenderClaim;
@@ -1584,7 +1590,7 @@ public class EntityEventHandler implements Listener
                             event.setIntensity(effected, 0);
                             if (!messagedPlayer)
                             {
-                                messageService.sendMessage(thrower, TextMode.Err, Messages.PlayerInPvPSafeZone);
+                                MessageService.sendMessage(thrower, TextMode.Err, Messages.PlayerInPvPSafeZone);
                                 messagedPlayer = true;
                             }
                         }

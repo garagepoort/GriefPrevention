@@ -17,12 +17,12 @@ import org.bukkit.entity.Player;
 public class RestoreNatureCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public RestoreNatureCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public RestoreNatureCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -33,7 +33,7 @@ public class RestoreNatureCmd extends AbstractCmd {
             //change shovel mode
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNature;
-            messageService.sendMessage(player, TextMode.Instr, Messages.RestoreNatureActivate);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.RestoreNatureActivate);
         });
 
         return true;

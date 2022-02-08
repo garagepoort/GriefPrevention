@@ -10,6 +10,8 @@ import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
+import me.ryanhamshire.GriefPrevention.claims.ResizeClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -22,11 +24,13 @@ import java.util.function.Supplier;
 @IocCommandHandler("extendclaim")
 public class ExtendClaimCmd extends AbstractCmd {
     private final DataStore dataStore;
-    private final MessageService messageService;
+    private final ClaimService claimService;
+    private final ResizeClaimService resizeClaimService;
 
-    public ExtendClaimCmd(DataStore dataStore, MessageService messageService) {
+    public ExtendClaimCmd(DataStore dataStore, ClaimService claimService, ResizeClaimService resizeClaimService) {
         this.dataStore = dataStore;
-        this.messageService = messageService;
+        this.claimService = claimService;
+        this.resizeClaimService = resizeClaimService;
     }
 
     @Override
@@ -47,34 +51,34 @@ public class ExtendClaimCmd extends AbstractCmd {
 
         //requires claim modification tool in hand
         if (player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != ConfigLoader.config_claims_modificationTool) {
-            messageService.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
+            MessageService.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
             return true;
         }
 
         //must be standing in a land claim
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-        Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
+        Claim claim = this.claimService.getClaimAt(player.getLocation(), true, playerData.lastClaim);
         if (claim == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.StandInClaimToResize);
+            MessageService.sendMessage(player, TextMode.Err, Messages.StandInClaimToResize);
             return true;
         }
 
         //must have permission to edit the land claim you're in
-        Supplier<String> errorMessage = claim.checkPermission(player, ClaimPermission.Edit, null);
+        Supplier<String> errorMessage = claimService.checkPermission(claim, player, ClaimPermission.Edit, null);
         if (errorMessage != null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
+            MessageService.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
             return true;
         }
 
         //determine new corner coordinates
         org.bukkit.util.Vector direction = player.getLocation().getDirection();
         if (direction.getY() > .75) {
-            messageService.sendMessage(player, TextMode.Info, Messages.ClaimsExtendToSky);
+            MessageService.sendMessage(player, TextMode.Info, Messages.ClaimsExtendToSky);
             return true;
         }
 
         if (direction.getY() < -.75) {
-            messageService.sendMessage(player, TextMode.Info, Messages.ClaimsAutoExtendDownward);
+            MessageService.sendMessage(player, TextMode.Info, Messages.ClaimsAutoExtendDownward);
             return true;
         }
 
@@ -122,7 +126,7 @@ public class ExtendClaimCmd extends AbstractCmd {
 
         //attempt resize
         playerData.claimResizing = claim;
-        this.dataStore.resizeClaimWithChecks(player, playerData, newx1, newx2, newy1, newy2, newz1, newz2);
+        this.resizeClaimService.resizeClaimWithChecks(player, playerData, newx1, newx2, newy1, newy2, newz1, newz2);
         playerData.claimResizing = null;
 
         return true;
@@ -130,11 +134,10 @@ public class ExtendClaimCmd extends AbstractCmd {
 
     private boolean sendVideoLink(Player player) {
         if (ConfigLoader.creativeRulesApply(player.getLocation())) {
-            messageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
         } else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
-            messageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
         }
         return false;
     }
-
 }

@@ -10,11 +10,11 @@ import static me.ryanhamshire.GriefPrevention.config.ConfigLoader.pvpRulesApply;
 @IocBean
 public class PvpProtectionService {
     private final DataStore dataStore;
-    private final MessageService messageService;
+    
 
-    public PvpProtectionService(DataStore dataStore, MessageService messageService) {
+    public PvpProtectionService(DataStore dataStore) {
         this.dataStore = dataStore;
-        this.messageService = messageService;
+        
     }
 
     //called when a player spawns, applies protection for that player if necessary
@@ -38,7 +38,7 @@ public class PvpProtectionService {
             playerData.pvpImmune = true;
 
             //inform the player after he finishes respawning
-            messageService.sendMessage(player, TextMode.Success, Messages.PvPImmunityStart, 5L);
+            MessageService.sendMessage(player, TextMode.Success, Messages.PvPImmunityStart, 5L);
 
             //start a task to re-check this player's inventory every minute until his immunity is gone
             PvPImmunityValidationTask task = new PvPImmunityValidationTask(player, dataStore);

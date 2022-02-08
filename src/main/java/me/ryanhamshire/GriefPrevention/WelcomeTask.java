@@ -11,12 +11,10 @@ import org.bukkit.inventory.meta.BookMeta;
 public class WelcomeTask implements Runnable
 {
     private final Player player;
-    private final DataStore datastore;
 
-    public WelcomeTask(Player player, DataStore dataStore)
+    public WelcomeTask(Player player)
     {
         this.player = player;
-        this.datastore = dataStore;
     }
 
     @Override
@@ -26,8 +24,8 @@ public class WelcomeTask implements Runnable
         if (!this.player.isOnline()) return;
 
         //offer advice and a helpful link
-        messageService.sendMessage(player, TextMode.Instr, Messages.AvoidGriefClaimLand);
-        messageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+        MessageService.sendMessage(player, TextMode.Instr, Messages.AvoidGriefClaimLand);
+        MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
 
         //give the player a reference book for later
         if (ConfigLoader.config_claims_supplyPlayerManual)

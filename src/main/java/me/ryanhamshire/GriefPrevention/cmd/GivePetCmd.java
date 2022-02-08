@@ -18,12 +18,12 @@ import org.bukkit.entity.Player;
 public class GivePetCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public GivePetCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public GivePetCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -38,14 +38,14 @@ public class GivePetCmd extends AbstractCmd {
             //special case: cancellation
             if (args[0].equalsIgnoreCase("cancel")) {
                 playerData.petGiveawayRecipient = null;
-                messageService.sendMessage(player, TextMode.Success, Messages.PetTransferCancellation);
+                MessageService.sendMessage(player, TextMode.Success, Messages.PetTransferCancellation);
                 return;
             }
 
             //find the specified player
             OfflinePlayer targetPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
             if (targetPlayer == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return;
             }
 
@@ -53,7 +53,7 @@ public class GivePetCmd extends AbstractCmd {
             playerData.petGiveawayRecipient = targetPlayer;
 
             //send instructions
-            messageService.sendMessage(player, TextMode.Instr, Messages.ReadyToTransferPet);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.ReadyToTransferPet);
         });
 
         return true;

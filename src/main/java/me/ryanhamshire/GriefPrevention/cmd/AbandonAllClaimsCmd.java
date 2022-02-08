@@ -23,14 +23,12 @@ import java.util.Vector;
 public class AbandonAllClaimsCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
 
-    public AbandonAllClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService, ClaimService claimService, ClaimBlockService claimBlockService) {
+    public AbandonAllClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
     }
@@ -43,19 +41,19 @@ public class AbandonAllClaimsCmd extends AbstractCmd {
         if (args.length > 1) return false;
 
         if (args.length != 1 || !"confirm".equalsIgnoreCase(args[0])) {
-            messageService.sendMessage(player, TextMode.Err, Messages.ConfirmAbandonAllClaims);
+            MessageService.sendMessage(player, TextMode.Err, Messages.ConfirmAbandonAllClaims);
             return false;
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
-            Vector<Claim> claims = claimService.getClaims(player);
+            Vector<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
             int originalClaimCount = claims.size();
 
             //check count
             if (originalClaimCount == 0) {
-                messageService.sendMessage(player, TextMode.Err, Messages.YouHaveNoClaims);
+                MessageService.sendMessage(player, TextMode.Err, Messages.YouHaveNoClaims);
                 return;
             }
 
@@ -63,9 +61,9 @@ public class AbandonAllClaimsCmd extends AbstractCmd {
                 claims.forEach(claim -> playerData.setAccruedClaimBlocks(claimBlockService.recalculateAccruedClaimBlocks(playerData) - (int) Math.ceil((claim.getArea() * (1 - ConfigLoader.config_claims_abandonReturnRatio)))));
             }
 
-            this.dataStore.deleteClaimsForPlayer(player.getUniqueId(), false);
+            claimService.deleteClaimsForPlayer(player.getUniqueId(), false);
             int remainingBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claims);
-            messageService.sendMessage(player, TextMode.Success, Messages.SuccessfulAbandon, String.valueOf(remainingBlocks));
+            MessageService.sendMessage(player, TextMode.Success, Messages.SuccessfulAbandon, String.valueOf(remainingBlocks));
             bukkitUtils.runTaskLater(player, () -> Visualization.Revert(player, playerData));
         });
 

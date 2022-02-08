@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.events.ClaimExpirationEvent;
 import org.bukkit.Bukkit;
@@ -27,51 +28,46 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Vector;
 
-class CleanupUnusedClaimTask implements Runnable
-{
+class CleanupUnusedClaimTask implements Runnable {
     Claim claim;
     PlayerData ownerData;
     OfflinePlayer ownerInfo;
 
-    private final DataStore dataStore;
+    private final ClaimService claimService;
 
-    CleanupUnusedClaimTask(Claim claim, PlayerData ownerData, OfflinePlayer ownerInfo, DataStore dataStore)
-    {
+    CleanupUnusedClaimTask(Claim claim, PlayerData ownerData, OfflinePlayer ownerInfo, ClaimService claimService) {
         this.claim = claim;
         this.ownerData = ownerData;
         this.ownerInfo = ownerInfo;
-        this.dataStore = dataStore;
+        this.claimService = claimService;
     }
 
     @Override
-    public void run()
-    {
-
+    public void run() {
 
         //determine area of the default chest claim
         int areaOfDefaultClaim = 0;
-        if (ConfigLoader.config_claims_automaticClaimsForNewPlayersRadius >= 0)
-        {
+        if (ConfigLoader.config_claims_automaticClaimsForNewPlayersRadius >= 0) {
             areaOfDefaultClaim = (int) Math.pow(ConfigLoader.config_claims_automaticClaimsForNewPlayersRadius * 2 + 1, 2);
         }
 
+        //make a copy of this player's claim list
+        Vector<Claim> claims = new Vector<>(claimService.getClaims(ownerInfo.getUniqueId(), ownerInfo.getName()));
+
         //if this claim is a chest claim and those are set to expire
-        if (ownerData.getClaims().size() == 1 && claim.getArea() <= areaOfDefaultClaim && ConfigLoader.config_claims_chestClaimExpirationDays > 0)
-        {
+        if (claims.size() == 1 && claim.getArea() <= areaOfDefaultClaim && ConfigLoader.config_claims_chestClaimExpirationDays > 0) {
             //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
             Calendar sevenDaysAgo = Calendar.getInstance();
             sevenDaysAgo.add(Calendar.DATE, -ConfigLoader.config_claims_chestClaimExpirationDays);
-            if (sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastPlayed())))
-            {
+            if (sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastPlayed()))) {
                 if (expireEventCanceled())
                     return;
                 claim.removeSurfaceFluids(null);
-                dataStore.deleteClaim(claim, true, true);
+                claimService.deleteClaim(claim, true, true);
 
                 //if configured to do so, restore the land to natural
-                if (ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner()) || ConfigLoader.config_claims_survivalAutoNatureRestoration)
-                {
-                    GriefPrevention.instance.restoreClaim(claim, 0);
+                if (ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner()) || ConfigLoader.config_claims_survivalAutoNatureRestoration) {
+                    claimService.restoreClaim(claim, 0);
                 }
 
                 GriefPrevention.AddLogEntry(" " + claim.getOwnerName() + "'s new player claim expired.", CustomLogEntryTypes.AdminActivity);
@@ -79,36 +75,28 @@ class CleanupUnusedClaimTask implements Runnable
         }
 
         //if configured to always remove claims after some inactivity period without exceptions...
-        else if (ConfigLoader.config_claims_expirationDays > 0)
-        {
+        else if (ConfigLoader.config_claims_expirationDays > 0) {
             Calendar earliestPermissibleLastLogin = Calendar.getInstance();
             earliestPermissibleLastLogin.add(Calendar.DATE, -ConfigLoader.config_claims_expirationDays);
 
-            if (earliestPermissibleLastLogin.getTime().after(new Date(ownerInfo.getLastPlayed())))
-            {
+            if (earliestPermissibleLastLogin.getTime().after(new Date(ownerInfo.getLastPlayed()))) {
                 if (expireEventCanceled())
                     return;
-                //make a copy of this player's claim list
-                Vector<Claim> claims = new Vector<>(ownerData.getClaims());
 
                 //delete them
-                dataStore.deleteClaimsForPlayer(claim.ownerID, true);
+                claimService.deleteClaimsForPlayer(claim.ownerID, true);
                 GriefPrevention.AddLogEntry(" All of " + claim.getOwnerName() + "'s claims have expired.", CustomLogEntryTypes.AdminActivity);
                 GriefPrevention.AddLogEntry("earliestPermissibleLastLogin#getTime: " + earliestPermissibleLastLogin.getTime(), CustomLogEntryTypes.Debug, true);
                 GriefPrevention.AddLogEntry("ownerInfo#getLastPlayed: " + ownerInfo.getLastPlayed(), CustomLogEntryTypes.Debug, true);
 
-                for (Claim claim : claims)
-                {
+                for (Claim claim : claims) {
                     //if configured to do so, restore the land to natural
-                    if (ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner()) || ConfigLoader.config_claims_survivalAutoNatureRestoration)
-                    {
-                        GriefPrevention.instance.restoreClaim(claim, 0);
+                    if (ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner()) || ConfigLoader.config_claims_survivalAutoNatureRestoration) {
+                        claimService.restoreClaim(claim, 0);
                     }
                 }
             }
-        }
-        else if (ConfigLoader.config_claims_unusedClaimExpirationDays > 0 && ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner()))
-        {
+        } else if (ConfigLoader.config_claims_unusedClaimExpirationDays > 0 && ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner())) {
             //avoid scanning large claims and administrative claims
             if (claim.isAdminClaim() || claim.getWidth() > 25 || claim.getHeight() > 25) return;
 
@@ -117,28 +105,25 @@ class CleanupUnusedClaimTask implements Runnable
 
             long investmentScore = claim.getPlayerInvestmentScore();
 
-            if (investmentScore < minInvestment)
-            {
+            if (investmentScore < minInvestment) {
                 //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
                 Calendar sevenDaysAgo = Calendar.getInstance();
                 sevenDaysAgo.add(Calendar.DATE, -ConfigLoader.config_claims_unusedClaimExpirationDays);
                 boolean claimExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastPlayed()));
-                if (claimExpired)
-                {
+                if (claimExpired) {
                     if (expireEventCanceled())
                         return;
-                    dataStore.deleteClaim(claim, true, true);
+                    claimService.deleteClaim(claim, true, true);
                     GriefPrevention.AddLogEntry("Removed " + claim.getOwnerName() + "'s unused claim @ " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()), CustomLogEntryTypes.AdminActivity);
 
                     //restore the claim area to natural state
-                    GriefPrevention.instance.restoreClaim(claim, 0);
+                    claimService.restoreClaim(claim, 0);
                 }
             }
         }
     }
 
-    public boolean expireEventCanceled()
-    {
+    public boolean expireEventCanceled() {
         //see if any other plugins don't want this claim deleted
         ClaimExpirationEvent event = new ClaimExpirationEvent(this.claim);
         Bukkit.getPluginManager().callEvent(event);

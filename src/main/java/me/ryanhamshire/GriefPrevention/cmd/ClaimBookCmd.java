@@ -17,12 +17,12 @@ import org.bukkit.entity.Player;
 public class ClaimBookCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    
 
-    public ClaimBookCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public ClaimBookCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        
     }
 
     @Override
@@ -32,10 +32,10 @@ public class ClaimBookCmd extends AbstractCmd {
         if (args.length != 1) return false;
         Player otherPlayer = GriefPrevention.get().getServer().getPlayer(args[0]);
         if (otherPlayer == null) {
-            messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+            MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
             return true;
         } else {
-            WelcomeTask task = new WelcomeTask(otherPlayer, dataStore);
+            WelcomeTask task = new WelcomeTask(otherPlayer);
             bukkitUtils.runTaskAsync(sender, task);
             return true;
         }

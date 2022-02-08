@@ -10,6 +10,7 @@ import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
 import me.ryanhamshire.GriefPrevention.Visualization;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
@@ -20,12 +21,13 @@ import org.bukkit.entity.Player;
 public class DeleteAllClaimsCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    private final ClaimService claimService;
 
-    public DeleteAllClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+
+    public DeleteAllClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        this.claimService = claimService;
     }
 
     @Override
@@ -39,14 +41,14 @@ public class DeleteAllClaimsCmd extends AbstractCmd {
             //try to find that player
             OfflinePlayer otherPlayer = GriefPrevention.get().resolvePlayerByName(args[0]);
             if (otherPlayer == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return;
             }
 
             //delete all that player's claims
-            this.dataStore.deleteClaimsForPlayer(otherPlayer.getUniqueId(), true);
+            this.claimService.deleteClaimsForPlayer(otherPlayer.getUniqueId(), true);
 
-            messageService.sendMessage(player, TextMode.Success, Messages.DeleteAllSuccess, otherPlayer.getName());
+            MessageService.sendMessage(player, TextMode.Success, Messages.DeleteAllSuccess, otherPlayer.getName());
             if (player != null) {
                 GriefPrevention.AddLogEntry(player.getName() + " deleted all claims belonging to " + otherPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity);
                 PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());

@@ -1,5 +1,6 @@
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ResizeClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.Bukkit;
 import org.bukkit.ChunkSnapshot;
@@ -19,15 +20,15 @@ public class AutoExtendClaimTask implements Runnable
     private final Claim claim;
     private final ArrayList<ChunkSnapshot> chunks;
     private final Environment worldType;
-    private final DataStore dataStore;
+    private final ResizeClaimService resizeClaimService;
     private final Map<Biome, Set<Material>> biomeMaterials = new HashMap<>();
 
-    public AutoExtendClaimTask(Claim claim, ArrayList<ChunkSnapshot> chunks, Environment worldType, DataStore dataStore)
+    public AutoExtendClaimTask(Claim claim, ArrayList<ChunkSnapshot> chunks, Environment worldType, ResizeClaimService resizeClaimService)
     {
         this.claim = claim;
         this.chunks = chunks;
         this.worldType = worldType;
-        this.dataStore = dataStore;
+        this.resizeClaimService = resizeClaimService;
     }
 
     @Override
@@ -103,7 +104,7 @@ public class AutoExtendClaimTask implements Runnable
         @Override
         public void run()
         {
-            dataStore.extendClaim(claim, newY);
+            resizeClaimService.extendClaim(claim, newY);
         }
     }
 

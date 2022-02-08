@@ -46,7 +46,7 @@ class PvPImmunityValidationTask implements Runnable
         {
             //if found, cancel invulnerability and notify
             playerData.pvpImmune = false;
-            messageService.sendMessage(player, TextMode.Warn, Messages.PvPImmunityEnd);
+            MessageService.sendMessage(player, TextMode.Warn, Messages.PvPImmunityEnd);
         }
         else
         {

@@ -7,13 +7,18 @@ import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.CreateClaimResult;
 import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
+import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
 import me.ryanhamshire.GriefPrevention.Visualization;
 import me.ryanhamshire.GriefPrevention.VisualizationType;
+import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
+import me.ryanhamshire.GriefPrevention.claims.ResizeClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
+import me.ryanhamshire.GriefPrevention.util.HelperUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.GameMode;
@@ -24,16 +29,23 @@ import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.Vector;
 
 @IocBean
 @IocCommandHandler("claim")
 public class ClaimCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
+    private final ClaimService claimService;
+    private final ClaimBlockService claimBlockService;
+    private final ResizeClaimService resizeClaimService;
 
-    public ClaimCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
+    public ClaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
+        this.claimService = claimService;
+        this.claimBlockService = claimBlockService;
+        this.resizeClaimService = resizeClaimService;
     }
 
     @Override
@@ -42,7 +54,7 @@ public class ClaimCmd extends AbstractCmd {
         Player player = (Player) sender;
 
         if (!GriefPrevention.instance.claimsEnabledForWorld(player.getWorld())) {
-            messageService.sendMessage(player, TextMode.Err, Messages.ClaimsDisabledWorld);
+            MessageService.sendMessage(player, TextMode.Err, Messages.ClaimsDisabledWorld);
             return true;
         }
 
@@ -50,10 +62,12 @@ public class ClaimCmd extends AbstractCmd {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
             //if he's at the claim count per player limit already and doesn't have permission to bypass, display an error message
+            Vector<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
+
             if (ConfigLoader.config_claims_maxClaimsPerPlayer > 0 &&
                 !player.hasPermission("griefprevention.overrideclaimcountlimit") &&
-                playerData.getClaims().size() >= ConfigLoader.config_claims_maxClaimsPerPlayer) {
-                messageService.sendMessage(player, TextMode.Err, Messages.ClaimCreationFailedOverClaimCountLimit);
+                claims.size() >= ConfigLoader.config_claims_maxClaimsPerPlayer) {
+                MessageService.sendMessage(player, TextMode.Err, Messages.ClaimCreationFailedOverClaimCountLimit);
                 return;
             }
 
@@ -62,10 +76,10 @@ public class ClaimCmd extends AbstractCmd {
             if (radius < 0) radius = (int) Math.ceil(Math.sqrt(ConfigLoader.config_claims_minArea) / 2);
 
             //if player has any claims, respect claim minimum size setting
-            if (playerData.getClaims().size() > 0) {
+            if (claims.size() > 0) {
                 //if player has exactly one land claim, this requires the claim modification tool to be in hand (or creative mode player)
-                if (playerData.getClaims().size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != ConfigLoader.config_claims_modificationTool) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
+                if (claims.size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != ConfigLoader.config_claims_modificationTool) {
+                    MessageService.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                     return;
                 }
 
@@ -74,8 +88,8 @@ public class ClaimCmd extends AbstractCmd {
 
             //allow for specifying the radius
             if (args.length > 0) {
-                if (playerData.getClaims().size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != ConfigLoader.config_claims_modificationTool) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
+                if (claims.size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != ConfigLoader.config_claims_modificationTool) {
+                    MessageService.sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
                     return;
                 }
 
@@ -83,12 +97,12 @@ public class ClaimCmd extends AbstractCmd {
                 try {
                     specifiedRadius = Integer.parseInt(args[0]);
                 } catch (NumberFormatException e) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
+                    MessageService.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
                     return;
                 }
 
                 if (specifiedRadius < radius) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
+                    MessageService.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
                     return;
                 }
                 radius = specifiedRadius;
@@ -101,39 +115,40 @@ public class ClaimCmd extends AbstractCmd {
 
             //player must have sufficient unused claim blocks
             int area = Math.abs((gc.getBlockX() - lc.getBlockX() + 1) * (gc.getBlockZ() - lc.getBlockZ() + 1));
-            int remaining = playerData.getRemainingClaimBlocks();
+            int remaining = claimBlockService.getRemainingClaimBlocks(playerData, claims);
             if (remaining < area) {
-                messageService.sendMessage(player, TextMode.Err, Messages.CreateClaimInsufficientBlocks, String.valueOf(area - remaining));
-                dataStore.tryAdvertiseAdminAlternatives(player);
+                MessageService.sendMessage(player, TextMode.Err, Messages.CreateClaimInsufficientBlocks, String.valueOf(area - remaining));
+                HelperUtil.tryAdvertiseAdminAlternatives(player);
                 return;
             }
 
-            CreateClaimResult result = this.dataStore.createClaim(lc.getWorld(),
+            CreateClaimResult result = this.claimService.createClaim(lc.getWorld(),
                 lc.getBlockX(), gc.getBlockX(),
                 lc.getBlockY() - ConfigLoader.config_claims_claimsExtendIntoGroundDistance - 1,
                 gc.getWorld().getHighestBlockYAt(gc) - ConfigLoader.config_claims_claimsExtendIntoGroundDistance - 1,
                 lc.getBlockZ(), gc.getBlockZ(),
-                player.getUniqueId(), null, null, player);
+                player.getUniqueId(), null, null, player,
+                false);
             if (!result.succeeded) {
                 if (result.claim != null) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapShort);
+                    MessageService.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapShort);
 
                     Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.ErrorClaim, player.getLocation());
-                    Visualization.Apply(player, visualization);
+                    Visualization.Apply(player, playerData, visualization);
                 } else {
-                    messageService.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapRegion);
+                    MessageService.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapRegion);
                 }
             } else {
-                messageService.sendMessage(player, TextMode.Success, Messages.CreateClaimSuccess);
+                MessageService.sendMessage(player, TextMode.Success, Messages.CreateClaimSuccess);
 
                 //link to a video demo of land claiming, based on world type
                 if (ConfigLoader.creativeRulesApply(player.getLocation())) {
-                    messageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                    MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
                 } else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
-                    messageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                    MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
                 Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation());
-                Visualization.Apply(player, visualization);
+                Visualization.Apply(player, playerData, visualization);
                 playerData.claimResizing = null;
                 playerData.lastShovelLocation = null;
 
@@ -157,7 +172,7 @@ public class ClaimCmd extends AbstractCmd {
             }
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(GriefPrevention.instance, new AutoExtendClaimTask(newClaim, snapshots, world.getEnvironment(), dataStore));
+        Bukkit.getScheduler().runTaskAsynchronously(GriefPrevention.instance, new AutoExtendClaimTask(newClaim, snapshots, world.getEnvironment(), resizeClaimService));
     }
 
 }

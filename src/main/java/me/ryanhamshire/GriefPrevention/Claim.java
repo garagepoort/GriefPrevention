@@ -19,9 +19,8 @@
 package me.ryanhamshire.GriefPrevention;
 
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
-import me.ryanhamshire.GriefPrevention.events.ClaimPermissionCheckEvent;
 import me.ryanhamshire.GriefPrevention.util.BoundingBox;
-import org.bukkit.Bukkit;
+import me.ryanhamshire.GriefPrevention.util.HelperUtil;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -33,9 +32,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -47,7 +43,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 //represents a player claim
 //creating an instance doesn't make an effective claim
@@ -56,14 +51,14 @@ public class Claim
 {
     //two locations, which together define the boundaries of the claim
     //note that the upper Y value is always ignored, because claims ALWAYS extend up to the sky
-    Location lesserBoundaryCorner;
-    Location greaterBoundaryCorner;
+    public Location lesserBoundaryCorner;
+    public Location greaterBoundaryCorner;
 
     //modification date.  this comes from the file timestamp during load, and is updated with runtime changes
     public Date modifiedDate;
 
     //id number.  unique to this claim, never changes.
-    Long id = null;
+    public Long id = null;
 
     //ownerID.  for admin claims, this is NULL
     //use getOwnerName() to get a friendly name (will be "an administrator" for admin claims)
@@ -118,17 +113,6 @@ public class Claim
     Claim()
     {
         this.modifiedDate = Calendar.getInstance().getTime();
-    }
-
-    //players may only siege someone when he's not in an admin claim
-    //and when he has some level of permission in the claim
-    public boolean canSiege(Player defender)
-    {
-        if (this.isAdminClaim()) return false;
-
-        if (this.checkPermission(defender, ClaimPermission.Access, null) != null) return false;
-
-        return true;
     }
 
     //removes any lava above sea level in a claim
@@ -212,7 +196,7 @@ public class Claim
     }
 
     //main constructor.  note that only creating a claim instance does nothing - a claim must be added to the data store to be effective
-    Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Long id)
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Long id)
     {
         //modification date
         this.modifiedDate = Calendar.getInstance().getTime();
@@ -254,7 +238,7 @@ public class Claim
         this.inheritNothing = inheritNothing;
     }
 
-    Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Long id)
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Long id)
     {
         this(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderIDs, containerIDs, accessorIDs, managerIDs, false, id);
     }
@@ -317,18 +301,6 @@ public class Claim
         return claim.contains(location, false, true);
     }
 
-    /**
-     * @deprecated Check {@link ClaimPermission#Edit} with {@link #checkPermission(Player, ClaimPermission, Event)}.
-     * @param player the Player
-     * @return the denial message, or null if the action is allowed
-     */
-    @Deprecated
-    public String allowEdit(Player player)
-    {
-        Supplier<String> supplier = checkPermission(player, ClaimPermission.Edit, null);
-        return supplier != null ? supplier.get() : null;
-    }
-
     private static final Set<Material> PLACEABLE_FARMING_BLOCKS = EnumSet.of(
             Material.PUMPKIN_STEM,
             Material.WHEAT,
@@ -342,22 +314,9 @@ public class Claim
             Material.CAVE_VINES,
             Material.CAVE_VINES_PLANT);
 
-    private static boolean placeableForFarming(Material material)
+    public static boolean placeableForFarming(Material material)
     {
         return PLACEABLE_FARMING_BLOCKS.contains(material);
-    }
-
-    /**
-     * @deprecated Check {@link ClaimPermission#Build} with {@link #checkPermission(Player, ClaimPermission, Event)}.
-     * @param player the Player
-     * @return the denial message, or null if the action is allowed
-     */
-    @Deprecated
-    //build permission check
-    public String allowBuild(Player player, Material material)
-    {
-        Supplier<String> supplier = checkPermission(player, ClaimPermission.Build, new CompatBuildBreakEvent(material, false));
-        return supplier != null ? supplier.get() : null;
     }
 
     public static class CompatBuildBreakEvent extends Event
@@ -430,196 +389,6 @@ public class Claim
         }
 
         return false;
-    }
-
-    /**
-     * Check whether or not a Player has a certain level of trust.
-     *
-     * @param player the Player being checked for permissions
-     * @param permission the ClaimPermission level required
-     * @param event the Event triggering the permission check
-     * @return the denial message or null if permission is granted
-     */
-    public Supplier<String> checkPermission(Player player, ClaimPermission permission, Event event)
-    {
-        return checkPermission(player, permission, event, null);
-    }
-
-    /**
-     * Check whether or not a Player has a certain level of trust. For internal use; allows changing default message.
-     *
-     * @param player the Player being checked for permissions
-     * @param permission the ClaimPermission level required
-     * @param event the Event triggering the permission check
-     * @param denialOverride a message overriding the default denial for clarity
-     * @return the denial message or null if permission is granted
-     */
-    Supplier<String> checkPermission(Player player, ClaimPermission permission, Event event, Supplier<String> denialOverride)
-    {
-        return callPermissionCheck(new ClaimPermissionCheckEvent(player, this, permission, event), denialOverride);
-    }
-
-    /**
-     * Check whether or not a UUID has a certain level of trust.
-     *
-     * @param uuid the UUID being checked for permissions
-     * @param permission the ClaimPermission level required
-     * @param event the Event triggering the permission check
-     * @return the denial reason or null if permission is granted
-     */
-    public Supplier<String> checkPermission(UUID uuid, ClaimPermission permission, Event event)
-    {
-        return callPermissionCheck(new ClaimPermissionCheckEvent(uuid, this, permission, event), null);
-    }
-
-    /**
-     * Helper method for calling a ClaimPermissionCheckEvent.
-     *
-     * @param event the ClaimPermissionCheckEvent to call
-     * @param denialOverride a message overriding the default denial for clarity
-     * @return the denial reason or null if permission is granted
-     */
-    private Supplier<String> callPermissionCheck(ClaimPermissionCheckEvent event, Supplier<String> denialOverride)
-    {
-        // Set denial message (if any) using default behavior.
-        Supplier<String> defaultDenial = getDefaultDenial(event.getCheckedPlayer(), event.getCheckedUUID(),
-                event.getRequiredPermission(), event.getTriggeringEvent());
-        // If permission is denied and a clarifying override is provided, use override.
-        if (defaultDenial != null && denialOverride != null) {
-            defaultDenial = denialOverride;
-        }
-
-        event.setDenialReason(defaultDenial);
-
-        Bukkit.getPluginManager().callEvent(event);
-
-        return event.getDenialReason();
-    }
-
-    /**
-     * Get the default reason for denial of a ClaimPermission.
-     *
-     * @param player the Player being checked for permissions
-     * @param uuid the UUID being checked for permissions
-     * @param permission the ClaimPermission required
-     * @param event the Event triggering the permission check
-     * @return the denial reason or null if permission is granted
-     */
-    private Supplier<String> getDefaultDenial(Player player, UUID uuid, ClaimPermission permission, Event event)
-    {
-        if (player != null)
-        {
-            // Admin claims need adminclaims permission only.
-            if (this.isAdminClaim())
-            {
-                if (player.hasPermission("griefprevention.adminclaims")) return null;
-            }
-
-            // Anyone with deleteclaims permission can edit non-admin claims at any time.
-            else if (permission == ClaimPermission.Edit && player.hasPermission("griefprevention.deleteclaims"))
-                return null;
-        }
-
-        // Claim owner and admins in ignoreclaims mode have access.
-        if (uuid.equals(this.getOwnerID()) || GriefPrevention.instance.dataStore.getPlayerData(uuid).ignoreClaims)
-            return null;
-
-        // Look for explicit individual permission.
-        if (player != null)
-        {
-            if (this.hasExplicitPermission(player, permission)) return null;
-        }
-        else
-        {
-            if (this.hasExplicitPermission(uuid, permission)) return null;
-        }
-
-        // Check for public permission.
-        if (permission.isGrantedBy(this.playerIDToClaimPermissionMap.get("public"))) return null;
-
-        // Special building-only rules.
-        if (permission == ClaimPermission.Build)
-        {
-            // No building while in PVP.
-            PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(uuid);
-            if (playerData.inPvpCombat())
-            {
-                return () -> MessageService.getMessage(Messages.NoBuildPvP);
-            }
-
-            // Allow farming crops with container trust.
-            Material material = null;
-            if (event instanceof BlockBreakEvent || event instanceof BlockPlaceEvent)
-                material = ((BlockEvent) event).getBlock().getType();
-
-            if (material != null && placeableForFarming(material)
-                    && this.getDefaultDenial(player, uuid, ClaimPermission.Inventory, event) == null)
-                return null;
-        }
-
-        // Permission inheritance for subdivisions.
-        if (this.parent != null)
-        {
-            if (!inheritNothing)
-                return this.parent.getDefaultDenial(player, uuid, permission, event);
-        }
-
-        // Catch-all error message for all other cases.
-        return () ->
-        {
-            String reason = MessageService.getMessage(permission.getDenialMessage(), this.getOwnerName());
-            if (player != null && player.hasPermission("griefprevention.ignoreclaims"))
-                reason += "  " + MessageService.getMessage(Messages.IgnoreClaimsAdvertisement);
-            return reason;
-        };
-    }
-
-    /**
-     * @deprecated Check {@link ClaimPermission#Build} with {@link #checkPermission(Player, ClaimPermission, Event)}.
-     * @param player the Player
-     * @return the denial message, or null if the action is allowed
-     */
-    @Deprecated
-    public String allowBreak(Player player, Material material)
-    {
-        Supplier<String> supplier = checkPermission(player, ClaimPermission.Build, new CompatBuildBreakEvent(material, true));
-        return supplier != null ? supplier.get() : null;
-    }
-
-    /**
-     * @deprecated Check {@link ClaimPermission#Access} with {@link #checkPermission(Player, ClaimPermission, Event)}.
-     * @param player the Player
-     * @return the denial message, or null if the action is allowed
-     */
-    @Deprecated
-    public String allowAccess(Player player)
-    {
-        Supplier<String> supplier = checkPermission(player, ClaimPermission.Access, null);
-        return supplier != null ? supplier.get() : null;
-    }
-
-    /**
-     * @deprecated Check {@link ClaimPermission#Inventory} with {@link #checkPermission(Player, ClaimPermission, Event)}.
-     * @param player the Player
-     * @return the denial message, or null if the action is allowed
-     */
-    @Deprecated
-    public String allowContainers(Player player)
-    {
-        Supplier<String> supplier = checkPermission(player, ClaimPermission.Inventory, null);
-        return supplier != null ? supplier.get() : null;
-    }
-
-    /**
-     * @deprecated Check {@link ClaimPermission#Manage} with {@link #checkPermission(Player, ClaimPermission, Event)}.
-     * @param player the Player
-     * @return the denial message, or null if the action is allowed
-     */
-    @Deprecated
-    public String allowGrantPermission(Player player)
-    {
-        Supplier<String> supplier = checkPermission(player, ClaimPermission.Manage, null);
-        return supplier != null ? supplier.get() : null;
     }
 
     public ClaimPermission getPermission(String playerID)
@@ -779,7 +548,7 @@ public class Claim
 
     //whether or not two claims overlap
     //used internally to prevent overlaps when creating claims
-    boolean overlaps(Claim otherClaim)
+    public boolean overlaps(Claim otherClaim)
     {
         if (!Objects.equals(this.lesserBoundaryCorner.getWorld(), otherClaim.getLesserBoundaryCorner().getWorld())) return false;
 
@@ -953,8 +722,16 @@ public class Claim
         return chunks;
     }
 
-    ArrayList<Long> getChunkHashes()
+    public HashMap<String, ClaimPermission> getPlayerIDToClaimPermissionMap() {
+        return playerIDToClaimPermissionMap;
+    }
+
+    public boolean isInheritNothing() {
+        return inheritNothing;
+    }
+
+    public ArrayList<Long> getChunkHashes()
     {
-        return DataStore.getChunkHashes(this);
+        return HelperUtil.getChunkHashes(this);
     }
 }

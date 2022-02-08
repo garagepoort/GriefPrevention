@@ -8,6 +8,7 @@ import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -17,12 +18,12 @@ import org.bukkit.entity.Player;
 public class RestrictSubclaimCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
-    private final MessageService messageService;
+    private final ClaimRepository claimRepository;
 
-    public RestrictSubclaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, MessageService messageService) {
+    public RestrictSubclaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimRepository claimRepository) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
-        this.messageService = messageService;
+        this.claimRepository = claimRepository;
     }
 
     @Override
@@ -32,9 +33,9 @@ public class RestrictSubclaimCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
 
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-            Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
+            Claim claim = this.claimRepository.getClaimAt(player.getLocation(), true, playerData.lastClaim);
             if (claim == null || claim.parent == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.StandInSubclaim);
+                MessageService.sendMessage(player, TextMode.Err, Messages.StandInSubclaim);
                 return;
             }
 
@@ -42,18 +43,18 @@ public class RestrictSubclaimCmd extends AbstractCmd {
             // If admin claim, fail if this user is not an admin
             // If not an admin claim, fail if this user is not the owner
             if (!playerData.ignoreClaims && (claim.isAdminClaim() ? !player.hasPermission("griefprevention.adminclaims") : !player.getUniqueId().equals(claim.parent.ownerID))) {
-                messageService.sendMessage(player, TextMode.Err, Messages.OnlyOwnersModifyClaims, claim.getOwnerName());
+                MessageService.sendMessage(player, TextMode.Err, Messages.OnlyOwnersModifyClaims, claim.getOwnerName());
                 return;
             }
 
             if (claim.getSubclaimRestrictions()) {
                 claim.setSubclaimRestrictions(false);
-                messageService.sendMessage(player, TextMode.Success, Messages.SubclaimUnrestricted);
+                MessageService.sendMessage(player, TextMode.Success, Messages.SubclaimUnrestricted);
             } else {
                 claim.setSubclaimRestrictions(true);
-                messageService.sendMessage(player, TextMode.Success, Messages.SubclaimRestricted);
+                MessageService.sendMessage(player, TextMode.Success, Messages.SubclaimRestricted);
             }
-            this.dataStore.saveClaim(claim);
+            this.claimRepository.saveClaim(claim);
         });
 
         return true;

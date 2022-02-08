@@ -12,6 +12,7 @@ import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.PlayerRescueService;
 import me.ryanhamshire.GriefPrevention.PlayerRescueTask;
 import me.ryanhamshire.GriefPrevention.TextMode;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.events.SaveTrappedPlayerEvent;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
@@ -26,13 +27,15 @@ public class TrappedCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
     private final PlayerRescueService playerRescueService;
-    private final MessageService messageService;
+    private final ClaimService claimService;
 
-    public TrappedCmd(DataStore dataStore, BukkitUtils bukkitUtils, PlayerRescueService playerRescueService, MessageService messageService) {
+
+    public TrappedCmd(DataStore dataStore, BukkitUtils bukkitUtils, PlayerRescueService playerRescueService, ClaimService claimService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
         this.playerRescueService = playerRescueService;
-        this.messageService = messageService;
+
+        this.claimService = claimService;
     }
 
     @Override
@@ -43,7 +46,7 @@ public class TrappedCmd extends AbstractCmd {
             //FEATURE: empower players who get "stuck" in an area where they don't have permission to build to save themselves
 
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-            Claim claim = this.dataStore.getClaimAt(player.getLocation(), false, playerData.lastClaim);
+            Claim claim = this.claimService.getClaimAt(player.getLocation(), false, playerData.lastClaim);
 
             //if another /trapped is pending, ignore this slash command
             if (playerData.pendingTrapped) {
@@ -51,8 +54,8 @@ public class TrappedCmd extends AbstractCmd {
             }
 
             //if the player isn't in a claim or has permission to build, tell him to man up
-            if (claim == null || claim.checkPermission(player, ClaimPermission.Build, null) == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.NotTrappedHere);
+            if (claim == null || claimService.checkPermission(claim, player, ClaimPermission.Build, null) == null) {
+                MessageService.sendMessage(player, TextMode.Err, Messages.NotTrappedHere);
                 return;
             }
 
@@ -62,20 +65,20 @@ public class TrappedCmd extends AbstractCmd {
 
             //if the player is in the nether or end, he's screwed (there's no way to programmatically find a safe place for him)
             if (player.getWorld().getEnvironment() != World.Environment.NORMAL && event.getDestination() == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
+                MessageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
                 return;
             }
 
             //if the player is in an administrative claim and AllowTrappedInAdminClaims is false, he should contact an admin
             if (!ConfigLoader.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
+                MessageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
                 return;
             }
             //send instructions
-            messageService.sendMessage(player, TextMode.Instr, Messages.RescuePending);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.RescuePending);
 
             //create a task to rescue this player in a little while
-            PlayerRescueTask task = new PlayerRescueTask(player, player.getLocation(), event.getDestination(), dataStore, playerRescueService, messageService);
+            PlayerRescueTask task = new PlayerRescueTask(player, player.getLocation(), event.getDestination(), dataStore, playerRescueService);
             Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 200L);  //20L ~ 1 second
         });
 

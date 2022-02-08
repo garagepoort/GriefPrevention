@@ -1,6 +1,7 @@
 package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.IocBean;
+import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.events.TrustChangedEvent;
 import org.bukkit.Bukkit;
@@ -14,19 +15,17 @@ import java.util.function.Supplier;
 @IocBean
 public class TrustService {
 
-    private final DataStore dataStore;
-    private final MessageService messageService;
     private final ClaimService claimService;
+    private final ClaimRepository claimRepository;
 
-    public TrustService(DataStore dataStore, MessageService messageService, ClaimService claimService) {
-        this.dataStore = dataStore;
-        this.messageService = messageService;
+    public TrustService(ClaimService claimService, ClaimRepository claimRepository) {
         this.claimService = claimService;
+        this.claimRepository = claimRepository;
     }
 
     public void handleTrust(Player player, ClaimPermission permissionLevel, String recipientName) {
         //determine which claim the player is standing in
-        Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
+        Claim claim = this.claimService.getClaimAt(player.getLocation(), true /*ignore height*/, null);
 
         //validate player or group argument
         String permission = null;
@@ -35,14 +34,14 @@ public class TrustService {
         if (recipientName.startsWith("[") && recipientName.endsWith("]")) {
             permission = recipientName.substring(1, recipientName.length() - 1);
             if (permission.isEmpty()) {
-                messageService.sendMessage(player, TextMode.Err, Messages.InvalidPermissionID);
+                MessageService.sendMessage(player, TextMode.Err, Messages.InvalidPermissionID);
                 return;
             }
         } else {
             otherPlayer = GriefPrevention.get().resolvePlayerByName(recipientName);
             boolean isPermissionFormat = recipientName.contains(".");
             if (otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all") && !isPermissionFormat) {
-                messageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return;
             }
 
@@ -60,11 +59,11 @@ public class TrustService {
         //determine which claims should be modified
         ArrayList<Claim> targetClaims = new ArrayList<>();
         if (claim == null) {
-            targetClaims.addAll(claimService.getClaims(player));
+            targetClaims.addAll(claimService.getClaims(player.getUniqueId(), player.getName()));
         } else {
             //check permission here
-            if (claim.checkPermission(player, ClaimPermission.Manage, null) != null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
+            if (claimService.checkPermission(claim, player, ClaimPermission.Manage, null) != null) {
+                MessageService.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
                 return;
             }
 
@@ -73,7 +72,7 @@ public class TrustService {
 
             //permission level null indicates granting permission trust
             if (permissionLevel == null) {
-                errorMessage = claim.checkPermission(player, ClaimPermission.Edit, null);
+                errorMessage = claimService.checkPermission(claim, player, ClaimPermission.Edit, null);
                 if (errorMessage != null) {
                     errorMessage = () -> "Only " + claim.getOwnerName() + " can grant /PermissionTrust here.";
                 }
@@ -81,12 +80,12 @@ public class TrustService {
 
             //otherwise just use the ClaimPermission enum values
             else {
-                errorMessage = claim.checkPermission(player, permissionLevel, null);
+                errorMessage = claimService.checkPermission(claim, player, permissionLevel, null);
             }
 
             //error message for trying to grant a permission the player doesn't have
             if (errorMessage != null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.CantGrantThatPermission);
+                MessageService.sendMessage(player, TextMode.Err, Messages.CantGrantThatPermission);
                 return;
             }
 
@@ -95,7 +94,7 @@ public class TrustService {
 
         //if we didn't determine which claims to modify, tell the player to be specific
         if (targetClaims.size() == 0) {
-            messageService.sendMessage(player, TextMode.Err, Messages.GrantPermissionNoClaim);
+            MessageService.sendMessage(player, TextMode.Err, Messages.GrantPermissionNoClaim);
             return;
         }
 
@@ -125,7 +124,7 @@ public class TrustService {
             } else {
                 currentClaim.setPermission(identifierToAdd, permissionLevel);
             }
-            this.dataStore.saveClaim(currentClaim);
+            this.claimRepository.saveClaim(currentClaim);
         }
 
         //notify player
@@ -149,6 +148,6 @@ public class TrustService {
             location = MessageService.getMessage(Messages.LocationCurrentClaim);
         }
 
-        messageService.sendMessage(player, TextMode.Success, Messages.GrantPermissionConfirmation, recipientName, permissionDescription, location);
+        MessageService.sendMessage(player, TextMode.Success, Messages.GrantPermissionConfirmation, recipientName, permissionDescription, location);
     }
 }

@@ -22,15 +22,15 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
     private final EconomyHandler economyHandler;
-    private final MessageService messageService;
+    
     private final ClaimBlockService claimBlockService;
     private final ClaimService claimService;
 
-    public BuyClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils, EconomyHandler economyHandler, MessageService messageService, ClaimBlockService claimBlockService, ClaimService claimService) {
+    public BuyClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils, EconomyHandler economyHandler, ClaimBlockService claimBlockService, ClaimService claimService) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
         this.economyHandler = economyHandler;
-        this.messageService = messageService;
+        
         this.claimBlockService = claimBlockService;
         this.claimService = claimService;
     }
@@ -44,18 +44,18 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
             //if economy is disabled, don't do anything
             EconomyHandler.EconomyWrapper economyWrapper = economyHandler.getWrapper();
             if (economyWrapper == null) {
-                messageService.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
+                MessageService.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
                 return;
             }
 
             if (!player.hasPermission("griefprevention.buysellclaimblocks")) {
-                messageService.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
+                MessageService.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
                 return;
             }
 
             //if purchase disabled, send error message
             if (ConfigLoader.config_economy_claimBlocksPurchaseCost == 0) {
-                messageService.sendMessage(player, TextMode.Err, Messages.OnlySellBlocks);
+                MessageService.sendMessage(player, TextMode.Err, Messages.OnlySellBlocks);
                 return;
             }
 
@@ -63,7 +63,7 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
 
             //if no parameter, just tell player cost per block and balance
             if (args.length != 1) {
-                messageService.sendMessage(player, TextMode.Info, Messages.BlockPurchaseCost, String.valueOf(ConfigLoader.config_economy_claimBlocksPurchaseCost), String.valueOf(economy.getBalance(player)));
+                MessageService.sendMessage(player, TextMode.Info, Messages.BlockPurchaseCost, String.valueOf(ConfigLoader.config_economy_claimBlocksPurchaseCost), String.valueOf(economy.getBalance(player)));
             } else {
                 PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
@@ -83,7 +83,7 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
                 double balance = economy.getBalance(player);
                 double totalCost = blockCount * ConfigLoader.config_economy_claimBlocksPurchaseCost;
                 if (totalCost > balance) {
-                    messageService.sendMessage(player, TextMode.Err, Messages.InsufficientFunds, String.valueOf(totalCost), String.valueOf(balance));
+                    MessageService.sendMessage(player, TextMode.Err, Messages.InsufficientFunds, String.valueOf(totalCost), String.valueOf(balance));
                 }
 
                 //otherwise carry out transaction
@@ -93,7 +93,7 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
                     //if the player is going to reach max bonus limit, send error message
                     int bonusBlocksLimit = ConfigLoader.config_economy_claimBlocksMaxBonus;
                     if (bonusBlocksLimit != 0 && newBonusClaimBlocks > bonusBlocksLimit) {
-                        messageService.sendMessage(player, TextMode.Err, Messages.MaxBonusReached, String.valueOf(blockCount), String.valueOf(bonusBlocksLimit));
+                        MessageService.sendMessage(player, TextMode.Err, Messages.MaxBonusReached, String.valueOf(blockCount), String.valueOf(bonusBlocksLimit));
                         return;
                     }
 
@@ -105,7 +105,7 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
                     this.dataStore.savePlayerData(player.getUniqueId(), playerData);
 
                     //inform player
-                    messageService.sendMessage(player, TextMode.Success, Messages.PurchaseConfirmation, String.valueOf(totalCost), String.valueOf(claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player))));
+                    MessageService.sendMessage(player, TextMode.Success, Messages.PurchaseConfirmation, String.valueOf(totalCost), String.valueOf(claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()))));
                 }
             }
         });
