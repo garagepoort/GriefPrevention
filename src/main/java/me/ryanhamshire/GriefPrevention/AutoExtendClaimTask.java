@@ -1,5 +1,6 @@
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.Bukkit;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.Material;
@@ -13,18 +14,20 @@ import java.util.Objects;
 import java.util.Set;
 
 //automatically extends a claim downward based on block types detected
-class AutoExtendClaimTask implements Runnable
+public class AutoExtendClaimTask implements Runnable
 {
     private final Claim claim;
     private final ArrayList<ChunkSnapshot> chunks;
     private final Environment worldType;
+    private final DataStore dataStore;
     private final Map<Biome, Set<Material>> biomeMaterials = new HashMap<>();
 
-    public AutoExtendClaimTask(Claim claim, ArrayList<ChunkSnapshot> chunks, Environment worldType)
+    public AutoExtendClaimTask(Claim claim, ArrayList<ChunkSnapshot> chunks, Environment worldType, DataStore dataStore)
     {
         this.claim = claim;
         this.chunks = chunks;
         this.worldType = worldType;
+        this.dataStore = dataStore;
     }
 
     @Override
@@ -82,7 +85,7 @@ class AutoExtendClaimTask implements Runnable
     private boolean yTooSmall(int y)
     {
         return y <= Objects.requireNonNull(claim.getLesserBoundaryCorner().getWorld()).getMinHeight()
-                || y <= GriefPrevention.instance.config_claims_maxDepth;
+                || y <= ConfigLoader.config_claims_maxDepth;
     }
 
     //runs in the main execution thread, where it can safely change claims and save those changes
@@ -100,7 +103,7 @@ class AutoExtendClaimTask implements Runnable
         @Override
         public void run()
         {
-            GriefPrevention.instance.dataStore.extendClaim(claim, newY);
+            dataStore.extendClaim(claim, newY);
         }
     }
 

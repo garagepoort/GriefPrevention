@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.griefprevention</groupId>
@@ -28,12 +29,11 @@
         <url>https://github.com/TechFortress/GriefPrevention/issues</url>
     </issueManagement>
 
-    <scm>
-        <developerConnection>scm:git:https://github.com/TechFortress/GriefPrevention.git</developerConnection>
-        <tag>16.18-RC1</tag>
-    </scm>
-
     <repositories>
+        <repository>
+            <id>staffplusplus-repo</id>
+            <url>https://nexus.staffplusplus.org/repository/staffplusplus/</url>
+        </repository>
         <repository>
             <id>paper-repo</id>
             <url>https://papermc.io/repo/repository/maven-public/</url>
@@ -127,11 +127,22 @@
                                         <exclude>META-INF/*.RSA</exclude>
                                     </excludes>
                                 </filter>
+                                <filter>
+                                    <artifact>be.garagepoort.mcioc:tubing</artifact>
+                                    <includes>
+                                        <include>**</include>
+                                    </includes>
+                                </filter>
                             </filters>
                             <relocations>
                                 <relocation>
                                     <pattern>com.zaxxer</pattern>
                                     <shadedPattern>me.ryanhamshire.GriefPrevention.libs.com.zaxxer</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>be.garagepoort.mcioc.</pattern>
+                                    <shadedPattern>me.ryanhamshire.GriefPrevention.libs.be.garagepoort.mcioc.
+                                    </shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
@@ -184,6 +195,19 @@
             <version>1.17-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
+        <dependency>
+            <groupId>be.garagepoort.mcioc</groupId>
+            <artifactId>tubing</artifactId>
+            <version>4.1.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- Worldguard dependency -->
         <dependency>
             <groupId>com.sk89q.worldguard</groupId>
@@ -239,16 +263,4 @@
             <version>5.0.1</version>
         </dependency>
     </dependencies>
-
-    <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-    </distributionManagement>
-
 </project>

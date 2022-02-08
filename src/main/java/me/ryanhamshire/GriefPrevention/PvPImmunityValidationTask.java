@@ -25,10 +25,12 @@ import org.bukkit.entity.Player;
 class PvPImmunityValidationTask implements Runnable
 {
     private final Player player;
+    private final DataStore dataStore;
 
-    public PvPImmunityValidationTask(Player player)
+    public PvPImmunityValidationTask(Player player, DataStore dataStore)
     {
         this.player = player;
+        this.dataStore = dataStore;
     }
 
     @Override
@@ -36,7 +38,7 @@ class PvPImmunityValidationTask implements Runnable
     {
         if (!player.isOnline()) return;
 
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
         if (!playerData.pvpImmune) return;
 
         //check the player's inventory for anything
@@ -44,7 +46,7 @@ class PvPImmunityValidationTask implements Runnable
         {
             //if found, cancel invulnerability and notify
             playerData.pvpImmune = false;
-            GriefPrevention.sendMessage(player, TextMode.Warn, Messages.PvPImmunityEnd);
+            messageService.sendMessage(player, TextMode.Warn, Messages.PvPImmunityEnd);
         }
         else
         {

@@ -19,17 +19,18 @@
 package me.ryanhamshire.GriefPrevention;
 
 import org.bukkit.ChatColor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 //sends a message to a player
 //used to send delayed messages, for example help text triggered by a player's chat
 class SendPlayerMessageTask implements Runnable
 {
-    private final Player player;
+    private final CommandSender player;
     private final ChatColor color;
     private final String message;
 
-    public SendPlayerMessageTask(Player player, ChatColor color, String message)
+    public SendPlayerMessageTask(CommandSender player, ChatColor color, String message)
     {
         this.player = player;
         this.color = color;
@@ -46,16 +47,16 @@ class SendPlayerMessageTask implements Runnable
         }
 
         //if the player is dead, save it for after his respawn
-        if (this.player.isDead())
+        if (player instanceof Player && ((Player) this.player).isDead())
         {
-            PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(this.player.getUniqueId());
+            PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(((Player) this.player).getUniqueId());
             playerData.messageOnRespawn = this.color + this.message;
         }
 
         //otherwise send it immediately
         else
         {
-            GriefPrevention.sendMessage(this.player, this.color, this.message);
+            messageService.sendMessage(this.player, this.color, this.message);
         }
     }
 }

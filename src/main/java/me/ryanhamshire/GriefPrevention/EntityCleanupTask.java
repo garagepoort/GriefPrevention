@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Boat;
@@ -48,7 +49,7 @@ class EntityCleanupTask implements Runnable
         ArrayList<World> worlds = new ArrayList<>();
         for (World world : GriefPrevention.instance.getServer().getWorlds())
         {
-            if (GriefPrevention.instance.config_claims_worldModes.get(world) == ClaimsMode.Creative)
+            if (ConfigLoader.config_claims_worldModes.get(world) == ClaimsMode.Creative)
             {
                 worlds.add(world);
             }
@@ -127,7 +128,7 @@ class EntityCleanupTask implements Runnable
             Claim claim = claims.get(j);
 
             //if it's a creative mode claim
-            if (GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
+            if (ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner()))
             {
                 //check its entity count and remove any extras
                 claim.allowMoreEntities(true);

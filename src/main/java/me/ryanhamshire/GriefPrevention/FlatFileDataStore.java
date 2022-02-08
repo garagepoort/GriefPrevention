@@ -24,6 +24,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -51,7 +52,7 @@ public class FlatFileDataStore extends DataStore
     private final static String nextClaimIdFilePath = claimDataFolderPath + File.separator + "_nextClaimID";
     private final static String schemaVersionFilePath = dataLayerFolderPath + File.separator + "_schemaVersion";
 
-    static boolean hasData()
+    public static boolean hasData()
     {
         File claimsDataFolder = new File(claimDataFolderPath);
 
@@ -59,9 +60,13 @@ public class FlatFileDataStore extends DataStore
     }
 
     //initialization!
-    FlatFileDataStore() throws Exception
+    public FlatFileDataStore() throws Exception
     {
+        super(messageService);
         this.initialize();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            new IgnoreLoaderThread(player.getUniqueId(), getPlayerData(player.getUniqueId()).ignoredPlayers).start();
+        }
     }
 
     @Override
@@ -798,7 +803,7 @@ public class FlatFileDataStore extends DataStore
         catch (IOException exception) {}
     }
 
-    synchronized void migrateData(DatabaseDataStore databaseStore)
+    public synchronized void migrateData(DatabaseDataStore databaseStore)
     {
         //migrate claims
         for (Claim claim : this.claims)

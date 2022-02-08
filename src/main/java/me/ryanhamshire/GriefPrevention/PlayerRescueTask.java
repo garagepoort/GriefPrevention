@@ -24,22 +24,28 @@ import org.bukkit.entity.Player;
 //tries to rescue a trapped player from a claim where he doesn't have permission to save himself
 //related to the /trapped slash command
 //this does run in the main thread, so it's okay to make non-thread-safe calls
-class PlayerRescueTask implements Runnable
+public class PlayerRescueTask implements Runnable
 {
     //original location where /trapped was used
     private final Location location;
 
     //rescue destination, may be decided at instantiation or at execution
     private Location destination;
+    private final DataStore dataStore;
+    private final PlayerRescueService playerRescueService;
 
     //player data
     private final Player player;
+    private final MessageService messageService;
 
-    public PlayerRescueTask(Player player, Location location, Location destination)
+    public PlayerRescueTask(Player player, Location location, Location destination, DataStore dataStore, PlayerRescueService playerRescueService, MessageService messageService)
     {
         this.player = player;
         this.location = location;
         this.destination = destination;
+        this.dataStore = dataStore;
+        this.playerRescueService = playerRescueService;
+        this.messageService = messageService;
     }
 
     @Override
@@ -49,20 +55,20 @@ class PlayerRescueTask implements Runnable
         if (!player.isOnline()) return;
 
         //he no longer has a pending /trapped slash command, so he can try to use it again now
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
         playerData.pendingTrapped = false;
 
         //if the player moved three or more blocks from where he used /trapped, admonish him and don't save him
         if (!player.getLocation().getWorld().equals(this.location.getWorld()) || player.getLocation().distance(this.location) > 3)
         {
-            GriefPrevention.sendMessage(player, TextMode.Err, Messages.RescueAbortedMoved);
+            messageService.sendMessage(player, TextMode.Err, Messages.RescueAbortedMoved);
             return;
         }
 
         //otherwise find a place to teleport him
         if (this.destination == null)
         {
-            this.destination = GriefPrevention.instance.ejectPlayer(this.player);
+            this.destination = playerRescueService.ejectPlayer(this.player);
         }
         else
         {

@@ -18,6 +18,8 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
+import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 
@@ -29,17 +31,21 @@ import java.util.UUID;
 class CleanupUnusedClaimPreTask implements Runnable
 {
     private UUID ownerID = null;
+    private final DataStore dataStore;
+    private final ClaimBlockService claimBlockService;
 
-    CleanupUnusedClaimPreTask(UUID uuid)
+    CleanupUnusedClaimPreTask(UUID uuid, DataStore dataStore, ClaimBlockService claimBlockService)
     {
         this.ownerID = uuid;
+        this.dataStore = dataStore;
+        this.claimBlockService = claimBlockService;
     }
 
     @Override
     public void run()
     {
         //get the data
-        PlayerData ownerData = GriefPrevention.instance.dataStore.getPlayerDataFromStorage(ownerID);
+        PlayerData ownerData = dataStore.getPlayerDataFromStorage(ownerID);
         OfflinePlayer ownerInfo = Bukkit.getServer().getOfflinePlayer(ownerID);
 
         GriefPrevention.AddLogEntry("Looking for expired claims.  Checking data for " + ownerID.toString(), CustomLogEntryTypes.Debug, true);
@@ -59,7 +65,7 @@ class CleanupUnusedClaimPreTask implements Runnable
 
         //skip claims belonging to exempted players based on block totals in config
         int bonusBlocks = ownerData.getBonusClaimBlocks();
-        if (bonusBlocks >= GriefPrevention.instance.config_claims_expirationExemptionBonusBlocks || bonusBlocks + ownerData.getAccruedClaimBlocks() >= GriefPrevention.instance.config_claims_expirationExemptionTotalBlocks)
+        if (bonusBlocks >= ConfigLoader.config_claims_expirationExemptionBonusBlocks || bonusBlocks + claimBlockService.recalculateAccruedClaimBlocks(ownerData) >= ConfigLoader.config_claims_expirationExemptionTotalBlocks)
         {
             GriefPrevention.AddLogEntry("Player exempt from claim expiration based on claim block counts vs. config file settings.", CustomLogEntryTypes.Debug, true);
             return;
@@ -67,7 +73,7 @@ class CleanupUnusedClaimPreTask implements Runnable
 
         Claim claimToExpire = null;
 
-        for (Claim claim : GriefPrevention.instance.dataStore.getClaims())
+        for (Claim claim : dataStore.getClaims())
         {
             if (ownerID.equals(claim.ownerID))
             {
@@ -83,6 +89,6 @@ class CleanupUnusedClaimPreTask implements Runnable
         }
 
         //pass it back to the main server thread, where it's safe to delete a claim if needed
-        Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, new CleanupUnusedClaimTask(claimToExpire, ownerData, ownerInfo), 1L);
+        Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, new CleanupUnusedClaimTask(claimToExpire, ownerData, ownerInfo, dataStore), 1L);
     }
 }

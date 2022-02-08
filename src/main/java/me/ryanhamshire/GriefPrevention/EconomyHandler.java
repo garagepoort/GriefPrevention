@@ -1,5 +1,8 @@
 package me.ryanhamshire.GriefPrevention;
 
+import be.garagepoort.mcioc.IocBean;
+import be.garagepoort.mcioc.IocListener;
+import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -10,24 +13,20 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 /**
  * Listener for events which may result in a change in the active Economy.
  */
+@IocBean
+@IocListener
 public class EconomyHandler implements Listener
 {
 
-    private final GriefPrevention instance;
     private boolean setupDone = false;
     private EconomyWrapper economy = null;
-
-    public EconomyHandler(GriefPrevention instance)
-    {
-        this.instance = instance;
-    }
 
     /**
      * Gets the current Economy inside of a wrapper class.
      *
      * @return the current wrapped Economy or null if no Economy is active
      */
-    EconomyWrapper getWrapper()
+    public EconomyWrapper getWrapper()
     {
         // Attempt to load the Economy if it is not already set up.
         loadEconomy(false);
@@ -69,7 +68,7 @@ public class EconomyHandler implements Listener
         if (setupState != setupDone) return;
 
         // Are we configured to allow transactions?
-        if (!(instance.config_economy_claimBlocksPurchaseCost > 0 || instance.config_economy_claimBlocksSellValue > 0))
+        if (!(ConfigLoader.config_economy_claimBlocksPurchaseCost > 0 || ConfigLoader.config_economy_claimBlocksSellValue > 0))
         {
             finishSetup(false, null);
             return;
@@ -86,7 +85,7 @@ public class EconomyHandler implements Listener
             return;
         }
 
-        RegisteredServiceProvider<Economy> registration = instance.getServer().getServicesManager().getRegistration(Economy.class);
+        RegisteredServiceProvider<Economy> registration = GriefPrevention.get().getServer().getServicesManager().getRegistration(Economy.class);
 
         // Ensure an Economy is available.
         if (registration == null)
@@ -119,7 +118,7 @@ public class EconomyHandler implements Listener
      * Wrapper class used to prevent Bukkit from logging an error and
      * preventing registering events for the listener when Vault is not loaded.
      */
-    static class EconomyWrapper
+    public static class EconomyWrapper
     {
 
         private final Economy economy;
@@ -129,7 +128,7 @@ public class EconomyHandler implements Listener
             this.economy = economy;
         }
 
-        Economy getEconomy()
+        public Economy getEconomy()
         {
             return this.economy;
         }

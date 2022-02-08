@@ -47,6 +47,6 @@ class VisualizationReversionTask implements Runnable
         // alert plugins of a visualization
         Bukkit.getPluginManager().callEvent(new VisualizationEvent(player, null, Collections.<Claim>emptySet()));
 
-        Visualization.Revert(player);
+        Visualization.Revert(player, playerData);
     }
 }

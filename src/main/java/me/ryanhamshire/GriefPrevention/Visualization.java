@@ -59,11 +59,9 @@ public class Visualization
 
     //reverts a visualization by sending another block change list, this time with the real world block values
 
-    public static void Revert(Player player)
+    public static void Revert(Player player, PlayerData playerData)
     {
         if (!player.isOnline()) return;
-
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
 
         Visualization visualization = playerData.currentVisualization;
 

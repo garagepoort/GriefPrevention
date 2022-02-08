@@ -18,6 +18,12 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import be.garagepoort.mcioc.IocBean;
+import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
+import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
+import org.bukkit.Bukkit;
+import org.bukkit.scheduler.BukkitRunnable;
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -31,14 +37,21 @@ import java.util.stream.Collectors;
 //...because the player has been gone a REALLY long time, and that expiration has been configured in config.yml
 
 //runs every 1 minute in the main thread
-class FindUnusedClaimsTask implements Runnable
+@IocBean
+public class FindUnusedClaimsTask extends BukkitRunnable
 {
     private List<UUID> claimOwnerUUIDs;
     private Iterator<UUID> claimOwnerIterator;
+    private final DataStore dataStore;
+    private final ClaimBlockService claimBlockService;
 
-    FindUnusedClaimsTask()
+    public FindUnusedClaimsTask(DataStore dataStore, ClaimBlockService claimBlockService)
     {
+        this.dataStore = dataStore;
+        this.claimBlockService = claimBlockService;
         refreshUUIDs();
+        Bukkit.getScheduler().scheduleSyncRepeatingTask(GriefPrevention.get(), this, 20L * 60, 20L * ConfigLoader.config_advanced_claim_expiration_check_rate);
+
     }
 
     @Override
@@ -54,13 +67,14 @@ class FindUnusedClaimsTask implements Runnable
             return;
         }
 
-        GriefPrevention.instance.getServer().getScheduler().runTaskAsynchronously(GriefPrevention.instance, new CleanupUnusedClaimPreTask(claimOwnerIterator.next()));
+        GriefPrevention.instance.getServer().getScheduler().runTaskAsynchronously(GriefPrevention.instance,
+            new CleanupUnusedClaimPreTask(claimOwnerIterator.next(), dataStore, claimBlockService));
     }
 
     public void refreshUUIDs()
     {
         // Fetch owner UUIDs from list of claims
-        claimOwnerUUIDs = GriefPrevention.instance.dataStore.claims.stream().map(claim -> claim.ownerID)
+        claimOwnerUUIDs = dataStore.claims.stream().map(claim -> claim.ownerID)
                 .distinct().filter(Objects::nonNull).collect(Collectors.toList());
 
         if (!claimOwnerUUIDs.isEmpty())

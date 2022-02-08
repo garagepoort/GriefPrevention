@@ -20,16 +20,17 @@ package me.ryanhamshire.GriefPrevention;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import me.ryanhamshire.GriefPrevention.database.DatabaseException;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 
 import javax.sql.DataSource;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -40,7 +41,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Properties;
 import java.util.UUID;
 
 //manages data stored in the file system
@@ -76,13 +76,17 @@ public class DatabaseDataStore extends DataStore
     private final String userName;
     private final String password;
 
-    DatabaseDataStore(String url, String userName, String password) throws Exception
+    public DatabaseDataStore(String url, String userName, String password) throws Exception
     {
+        super(messageService);
         this.databaseUrl = url;
         this.userName = userName;
         this.password = password;
 
         this.initialize();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            new IgnoreLoaderThread(player.getUniqueId(), getPlayerData(player.getUniqueId()).ignoredPlayers).start();
+        }
     }
 
     @Override
@@ -231,6 +235,7 @@ public class DatabaseDataStore extends DataStore
                         {
                             GriefPrevention.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
                             GriefPrevention.AddLogEntry(e.getMessage());
+                            throw new DatabaseException(e.getCause());
                         }
                     }
                 }
@@ -238,7 +243,7 @@ public class DatabaseDataStore extends DataStore
                 {
                     GriefPrevention.AddLogEntry("Unable to convert player data.  Details:");
                     GriefPrevention.AddLogEntry(e.getMessage());
-                    e.printStackTrace();
+                    throw new DatabaseException(e.getCause());
                 }
             }
 
@@ -356,7 +361,7 @@ public class DatabaseDataStore extends DataStore
                 catch (SQLException e)
                 {
                     GriefPrevention.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
-                    e.printStackTrace();
+                    throw new DatabaseException(e.getCause());
                 }
             }
 
@@ -415,6 +420,7 @@ public class DatabaseDataStore extends DataStore
         {
             GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
         }
     }
 
@@ -459,6 +465,7 @@ public class DatabaseDataStore extends DataStore
         {
             GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
         }
     }
 
@@ -475,7 +482,7 @@ public class DatabaseDataStore extends DataStore
         {
             GriefPrevention.AddLogEntry("Unable to delete data for claim " + claim.id + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
-            e.printStackTrace();
+            throw new DatabaseException(e.getCause());
         }
     }
 
@@ -502,6 +509,7 @@ public class DatabaseDataStore extends DataStore
             StringWriter errors = new StringWriter();
             e.printStackTrace(new PrintWriter(errors));
             GriefPrevention.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
+            throw new DatabaseException(e.getCause());
         }
 
         return playerData;
@@ -531,7 +539,7 @@ public class DatabaseDataStore extends DataStore
 
             insertStmnt.setString(1, playerID);
             insertStmnt.setString(2, dateString);
-            insertStmnt.setInt(3, playerData.getAccruedClaimBlocks());
+            insertStmnt.setInt(3, playerData.accruedClaimBlocks);
             insertStmnt.setInt(4, playerData.getBonusClaimBlocks());
             insertStmnt.executeUpdate();
         }
@@ -540,6 +548,7 @@ public class DatabaseDataStore extends DataStore
             StringWriter errors = new StringWriter();
             e.printStackTrace(new PrintWriter(errors));
             GriefPrevention.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
+            throw new DatabaseException(e.getCause());
         }
     }
 
@@ -566,6 +575,7 @@ public class DatabaseDataStore extends DataStore
         {
             GriefPrevention.AddLogEntry("Unable to set next claim ID to " + nextID + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
         }
     }
 
@@ -593,6 +603,7 @@ public class DatabaseDataStore extends DataStore
         {
             GriefPrevention.AddLogEntry("Unable to save data for group " + groupName + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
         }
     }
 
@@ -654,8 +665,7 @@ public class DatabaseDataStore extends DataStore
         {
             GriefPrevention.AddLogEntry("Unable to retrieve schema version from database.  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
-            e.printStackTrace();
-            return 0;
+            throw new DatabaseException(e.getCause());
         }
     }
 
@@ -675,6 +685,7 @@ public class DatabaseDataStore extends DataStore
         {
             GriefPrevention.AddLogEntry("Unable to set next schema version to " + versionToSet + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
         }
     }
 

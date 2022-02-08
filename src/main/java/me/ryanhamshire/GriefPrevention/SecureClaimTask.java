@@ -26,10 +26,12 @@ import java.util.Collection;
 class SecureClaimTask implements Runnable
 {
     private final SiegeData siegeData;
+    private final PlayerRescueService playerRescueService;
 
     public SecureClaimTask(SiegeData siegeData)
     {
         this.siegeData = siegeData;
+        this.playerRescueService = GriefPrevention.get().getIocContainer().get(PlayerRescueService.class);
     }
 
     @Override
@@ -49,8 +51,8 @@ class SecureClaimTask implements Runnable
             {
                 if (claim.contains(player.getLocation(), false, false) && claim.checkPermission(player, ClaimPermission.Access, null) != null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.SiegeDoorsLockedEjection);
-                    GriefPrevention.instance.ejectPlayer(player);
+                    messageService.sendMessage(player, TextMode.Err, Messages.SiegeDoorsLockedEjection);
+                    playerRescueService.ejectPlayer(player);
                 }
             }
         }
