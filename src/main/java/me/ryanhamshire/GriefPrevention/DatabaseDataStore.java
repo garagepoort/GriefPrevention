@@ -18,7 +18,6 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.database.DatabaseException;
 import me.ryanhamshire.GriefPrevention.database.SqlConnectionProvider;
 import org.bukkit.Bukkit;
@@ -34,37 +33,33 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 //manages data stored in the file system
-public class DatabaseDataStore extends DataStore
-{
+public class DatabaseDataStore extends DataStore {
 
     private static final String SQL_UPDATE_NAME =
-            "UPDATE griefprevention_playerdata SET name = ? WHERE name = ?";
+        "UPDATE griefprevention_playerdata SET name = ? WHERE name = ?";
     private static final String SQL_SELECT_PLAYER_DATA =
-            "SELECT * FROM griefprevention_playerdata WHERE name = ?";
+        "SELECT * FROM griefprevention_playerdata WHERE name = ?";
     private static final String SQL_DELETE_PLAYER_DATA =
-            "DELETE FROM griefprevention_playerdata WHERE name = ?";
+        "DELETE FROM griefprevention_playerdata WHERE name = ?";
     private static final String SQL_INSERT_PLAYER_DATA =
-            "INSERT INTO griefprevention_playerdata (name, lastlogin, accruedblocks, bonusblocks) VALUES (?, ?, ?, ?)";
-    private static final String SQL_SET_NEXT_CLAIM_ID =
-            "INSERT INTO griefprevention_nextclaimid VALUES (?)";
+        "INSERT INTO griefprevention_playerdata (name, lastlogin, accruedblocks, bonusblocks) VALUES (?, ?, ?, ?)";
     private static final String SQL_DELETE_GROUP_DATA =
-            "DELETE FROM griefprevention_playerdata WHERE name = ?";
+        "DELETE FROM griefprevention_playerdata WHERE name = ?";
     private static final String SQL_INSERT_SCHEMA_VERSION =
-            "INSERT INTO griefprevention_schemaversion VALUES (?)";
-    private static final String SQL_DELETE_NEXT_CLAIM_ID =
-            "DELETE FROM griefprevention_nextclaimid";
+        "INSERT INTO griefprevention_schemaversion VALUES (?)";
     private static final String SQL_DELETE_SCHEMA_VERSION =
-            "DELETE FROM griefprevention_schemaversion";
+        "DELETE FROM griefprevention_schemaversion";
     private static final String SQL_SELECT_SCHEMA_VERSION =
-            "SELECT * FROM griefprevention_schemaversion";
+        "SELECT * FROM griefprevention_schemaversion";
 
     private final SqlConnectionProvider sqlConnectionProvider;
-    public DatabaseDataStore(SqlConnectionProvider sqlConnectionProvider) throws Exception
-    {
+
+    public DatabaseDataStore(SqlConnectionProvider sqlConnectionProvider) throws Exception {
         super();
         this.sqlConnectionProvider = sqlConnectionProvider;
 
@@ -75,40 +70,21 @@ public class DatabaseDataStore extends DataStore
     }
 
     @Override
-    void initialize() throws Exception
-    {
-        try (Connection connection = sqlConnectionProvider.getConnection())
-        {
+    void initialize() throws Exception {
+        try (Connection connection = sqlConnectionProvider.getConnection()) {
 
-            try (Statement statement = connection.createStatement())
-            {
+            try (Statement statement = connection.createStatement()) {
                 //ensure the data tables exist
-                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_nextclaimid (nextid INTEGER)");
-                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_claimdata (id INTEGER, owner VARCHAR(50), lessercorner VARCHAR(100), greatercorner VARCHAR(100), builders TEXT, containers TEXT, accessors TEXT, managers TEXT, inheritnothing BOOLEAN, parentid INTEGER)");
-                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_playerdata (name VARCHAR(50), lastlogin DATETIME, accruedblocks INTEGER, bonusblocks INTEGER)");
+                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_claimdata (id INTEGER AUTO_INCREMENT, owner VARCHAR(50), lessercorner VARCHAR(100), greatercorner VARCHAR(100), builders TEXT, containers TEXT, accessors TEXT, managers TEXT, inheritnothing BOOLEAN, parentid INTEGER, PRIMARY KEY (ID))");
+                statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_playerdata (name VARCHAR(50), lastlogin DATETIME, accruedblocks INTEGER, bonusblocks INTEGER, PRIMARY KEY (name))");
                 statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_schemaversion (version INTEGER)");
 
-                // By making this run only for MySQL, we technically support SQLite too, as this is the only invalid
-                // SQL we use that SQLite does not support. Seeing as its only use is to update VERY old, existing, MySQL
-                // databases, this is of no concern.
-                if (ConfigLoader.databaseUrl.startsWith("jdbc:mysql://"))
-                {
-                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY builders TEXT");
-                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY containers TEXT");
-                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY accessors TEXT");
-                    statement.execute("ALTER TABLE griefprevention_claimdata MODIFY managers TEXT");
-                }
+                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY builders TEXT");
+                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY containers TEXT");
+                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY accessors TEXT");
+                statement.execute("ALTER TABLE griefprevention_claimdata MODIFY managers TEXT");
 
-                //if the next claim id table is empty, this is a brand new database which will write using the latest schema
-                //otherwise, schema version is determined by schemaversion table (or =0 if table is empty, see getSchemaVersion())
-                ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid");
-                if (!results.next())
-                {
-                    this.setSchemaVersion(latestSchemaVersion);
-                }
-            }
-            catch (Exception e3)
-            {
+            } catch (Exception e3) {
                 GriefPrevention.AddLogEntry("ERROR: Unable to create the necessary database table.  Details:");
                 GriefPrevention.AddLogEntry(e3.getMessage());
                 e3.printStackTrace();
@@ -116,48 +92,40 @@ public class DatabaseDataStore extends DataStore
             }
 
             super.initialize();
-
-        }
-        catch (Exception e2)
-        {
+        } catch (Exception e2) {
             GriefPrevention.AddLogEntry("ERROR: Unable to connect to database.  Check your config file settings.");
             throw e2;
         }
     }
 
     @Override
-    PlayerData getPlayerDataFromStorage(UUID playerID)
-    {
-        PlayerData playerData = new PlayerData();
-        playerData.playerID = playerID;
+    Optional<PlayerData> getPlayerDataFromStorage(UUID playerID) {
 
-        try (PreparedStatement selectStmnt = sqlConnectionProvider.getConnection().prepareStatement(SQL_SELECT_PLAYER_DATA))
-        {
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             PreparedStatement selectStmnt = connection.prepareStatement(SQL_SELECT_PLAYER_DATA)) {
             selectStmnt.setString(1, playerID.toString());
-            ResultSet results = selectStmnt.executeQuery();
-
-            //if data for this player exists, use it
-            if (results.next())
-            {
-                playerData.setAccruedClaimBlocks(results.getInt("accruedblocks"));
-                playerData.setBonusClaimBlocks(results.getInt("bonusblocks"));
+            try (ResultSet results = selectStmnt.executeQuery()) {
+                //if data for this player exists, use it
+                if (results.next()) {
+                    PlayerData playerData = new PlayerData(playerID);
+                    playerData.setAccruedClaimBlocks(results.getInt("accruedblocks"));
+                    playerData.setBonusClaimBlocks(results.getInt("bonusblocks"));
+                    return Optional.of(playerData);
+                }
             }
-        }
-        catch (SQLException e)
-        {
+        } catch (SQLException e) {
             StringWriter errors = new StringWriter();
             e.printStackTrace(new PrintWriter(errors));
             GriefPrevention.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
             throw new DatabaseException(e.getCause());
         }
 
-        return playerData;
+        return Optional.empty();
     }
 
     //saves changes to player data.  MUST be called after you're done making changes, otherwise a reload will lose them
     @Override
-    public void overrideSavePlayerData(UUID playerID, PlayerData playerData)
-    {
+    public void overrideSavePlayerData(UUID playerID, PlayerData playerData) {
         //never save data for the "administrative" account.  an empty string for player name indicates administrative account
         if (playerID == null) return;
 
@@ -168,17 +136,17 @@ public class DatabaseDataStore extends DataStore
     public ConcurrentHashMap<String, Integer> getGroupBonusBlocks() {
         ConcurrentHashMap<String, Integer> permissionBonusBlocks = new ConcurrentHashMap<>();
 
-        try (Statement statement = sqlConnectionProvider.getConnection().createStatement()){
-            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_playerdata");
-
-            while (results.next())
-            {
-                String name = results.getString("name");
-                if (!name.startsWith("$")) continue;
-                String groupName = name.substring(1);
-                if (groupName.isEmpty()) continue;
-                int groupBonusBlocks = results.getInt("bonusblocks");
-                permissionBonusBlocks.put(groupName, groupBonusBlocks);
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             Statement statement = connection.createStatement()) {
+            try (ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_playerdata")) {
+                while (results.next()) {
+                    String name = results.getString("name");
+                    if (!name.startsWith("$")) continue;
+                    String groupName = name.substring(1);
+                    if (groupName.isEmpty()) continue;
+                    int groupBonusBlocks = results.getInt("bonusblocks");
+                    permissionBonusBlocks.put(groupName, groupBonusBlocks);
+                }
             }
         } catch (SQLException e) {
             throw new DatabaseException(e.getCause());
@@ -186,11 +154,10 @@ public class DatabaseDataStore extends DataStore
         return permissionBonusBlocks;
     }
 
-    private void savePlayerData(String playerID, PlayerData playerData)
-    {
-        try (Connection databaseConnection = sqlConnectionProvider.getConnection(); PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_PLAYER_DATA);
-             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
-        {
+    private void savePlayerData(String playerID, PlayerData playerData) {
+        try (Connection databaseConnection = sqlConnectionProvider.getConnection();
+             PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_PLAYER_DATA);
+             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA)) {
             OfflinePlayer player = Bukkit.getOfflinePlayer(UUID.fromString(playerID));
 
             SimpleDateFormat sqlFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -203,9 +170,7 @@ public class DatabaseDataStore extends DataStore
             insertStmnt.setInt(3, playerData.accruedClaimBlocks);
             insertStmnt.setInt(4, playerData.getBonusClaimBlocks());
             insertStmnt.executeUpdate();
-        }
-        catch (SQLException e)
-        {
+        } catch (SQLException e) {
             StringWriter errors = new StringWriter();
             e.printStackTrace(new PrintWriter(errors));
             GriefPrevention.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
@@ -215,13 +180,11 @@ public class DatabaseDataStore extends DataStore
 
     //updates the database with a group's bonus blocks
     @Override
-    synchronized void saveGroupBonusBlocks(String groupName, int currentValue)
-    {
+    synchronized void saveGroupBonusBlocks(String groupName, int currentValue) {
         //group bonus blocks are stored in the player data table, with player name = $groupName
         try (Connection databaseConnection = sqlConnectionProvider.getConnection();
              PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_GROUP_DATA);
-             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA))
-        {
+             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_PLAYER_DATA)) {
             SimpleDateFormat sqlFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             String dateString = sqlFormat.format(new Date());
             deleteStmnt.setString(1, '$' + groupName);
@@ -232,9 +195,7 @@ public class DatabaseDataStore extends DataStore
             insertStmnt.setInt(3, 0);
             insertStmnt.setInt(4, currentValue);
             insertStmnt.executeUpdate();
-        }
-        catch (SQLException e)
-        {
+        } catch (SQLException e) {
             GriefPrevention.AddLogEntry("Unable to save data for group " + groupName + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
             throw new DatabaseException(e.getCause());
@@ -242,26 +203,21 @@ public class DatabaseDataStore extends DataStore
     }
 
     @Override
-    protected int getSchemaVersionFromStorage()
-    {
-        try (PreparedStatement selectStmnt = sqlConnectionProvider.getConnection().prepareStatement(SQL_SELECT_SCHEMA_VERSION))
-        {
-            ResultSet results = selectStmnt.executeQuery();
-
-            //if there's nothing yet, assume 0 and add it
-            if (!results.next())
-            {
-                this.setSchemaVersion(0);
-                return 0;
+    protected int getSchemaVersionFromStorage() {
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             PreparedStatement selectStmnt = connection.prepareStatement(SQL_SELECT_SCHEMA_VERSION)) {
+            try (ResultSet results = selectStmnt.executeQuery()) {
+                //if there's nothing yet, assume 0 and add it
+                if (!results.next()) {
+                    this.setSchemaVersion(0);
+                    return 0;
+                }
+                //otherwise return the value that's in the table
+                else {
+                    return results.getInt("version");
+                }
             }
-            //otherwise return the value that's in the table
-            else
-            {
-                return results.getInt("version");
-            }
-        }
-        catch (SQLException e)
-        {
+        } catch (SQLException e) {
             GriefPrevention.AddLogEntry("Unable to retrieve schema version from database.  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
             throw new DatabaseException(e.getCause());
@@ -269,23 +225,18 @@ public class DatabaseDataStore extends DataStore
     }
 
     @Override
-    protected void updateSchemaVersionInStorage(int versionToSet)
-    {
+    protected void updateSchemaVersionInStorage(int versionToSet) {
         try (Connection databaseConnection = sqlConnectionProvider.getConnection();
              PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_SCHEMA_VERSION);
-             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_SCHEMA_VERSION))
-        {
+             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_INSERT_SCHEMA_VERSION)) {
             deleteStmnt.execute();
 
             insertStmnt.setInt(1, versionToSet);
             insertStmnt.executeUpdate();
-        }
-        catch (SQLException e)
-        {
+        } catch (SQLException e) {
             GriefPrevention.AddLogEntry("Unable to set next schema version to " + versionToSet + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
             throw new DatabaseException(e.getCause());
         }
     }
-
 }

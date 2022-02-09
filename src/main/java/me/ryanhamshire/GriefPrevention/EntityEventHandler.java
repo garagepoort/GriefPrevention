@@ -24,7 +24,6 @@ import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.events.PreventPvPEvent;
-import me.ryanhamshire.GriefPrevention.events.ProtectDeathDropsEvent;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -75,7 +74,6 @@ import org.bukkit.event.entity.EntityCombustByEntityEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
-import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityInteractEvent;
 import org.bukkit.event.entity.EntityPortalEnterEvent;
@@ -558,68 +556,6 @@ public class EntityEventHandler implements Listener
         {
             event.setCancelled(true);
             return;
-        }
-    }
-
-    //when an entity dies...
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onEntityDeath(EntityDeathEvent event)
-    {
-        LivingEntity entity = event.getEntity();
-
-        //don't do the rest in worlds where claims are not enabled
-        if (!GriefPrevention.get().claimsEnabledForWorld(entity.getWorld())) return;
-
-        //special rule for creative worlds: killed entities don't drop items or experience orbs
-        if (ConfigLoader.creativeRulesApply(entity.getLocation()))
-        {
-            event.setDroppedExp(0);
-            event.getDrops().clear();
-        }
-
-        //FEATURE: when a player is involved in a siege (attacker or defender role)
-        //his death will end the siege
-
-        if (entity.getType() != EntityType.PLAYER) return;  //only tracking players
-
-        Player player = (Player) entity;
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-
-        //if involved in a siege
-        if (playerData.siegeData != null)
-        {
-            this.siegeService.endSiege(playerData.siegeData, null, player.getName(), event.getDrops());
-        }
-
-        //FEATURE: lock dropped items to player who dropped them
-
-        World world = entity.getWorld();
-
-        //decide whether or not to apply this feature to this situation (depends on the world where it happens)
-        boolean isPvPWorld = GriefPrevention.get().pvpRulesApply(world);
-        if ((isPvPWorld && ConfigLoader.config_lockDeathDropsInPvpWorlds) ||
-                (!isPvPWorld && ConfigLoader.config_lockDeathDropsInNonPvpWorlds))
-        {
-            Claim claim = this.claimService.getClaimAt(player.getLocation(), false, playerData.lastClaim);
-            ProtectDeathDropsEvent protectionEvent = new ProtectDeathDropsEvent(claim);
-            Bukkit.getPluginManager().callEvent(protectionEvent);
-            if (!protectionEvent.isCancelled())
-            {
-                //remember information about these drops so that they can be marked when they spawn as items
-                long expirationTime = System.currentTimeMillis() + 3000;  //now + 3 seconds
-                Location deathLocation = player.getLocation();
-                UUID playerID = player.getUniqueId();
-                List<ItemStack> drops = event.getDrops();
-                for (ItemStack stack : drops)
-                {
-                    GriefPrevention.get().pendingItemWatchList.add(
-                            new PendingItemProtection(deathLocation, playerID, expirationTime, stack));
-                }
-
-                //allow the player to receive a message about how to unlock any drops
-                playerData.dropsAreUnlocked = false;
-                playerData.receivedDropUnlockAdvertisement = false;
-            }
         }
     }
 

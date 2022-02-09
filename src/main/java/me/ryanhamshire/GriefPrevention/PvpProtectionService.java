@@ -5,6 +5,7 @@ import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 
+import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 import static me.ryanhamshire.GriefPrevention.config.ConfigLoader.pvpRulesApply;
 
 @IocBean
@@ -38,7 +39,7 @@ public class PvpProtectionService {
             playerData.pvpImmune = true;
 
             //inform the player after he finishes respawning
-            MessageService.sendMessage(player, TextMode.Success, Messages.PvPImmunityStart, 5L);
+            sendMessage(player, TextMode.Success, Messages.PvPImmunityStart, 5L);
 
             //start a task to re-check this player's inventory every minute until his immunity is gone
             PvPImmunityValidationTask task = new PvPImmunityValidationTask(player, dataStore);

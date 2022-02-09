@@ -19,7 +19,6 @@ import me.ryanhamshire.GriefPrevention.TextMode;
 import me.ryanhamshire.GriefPrevention.Visualization;
 import me.ryanhamshire.GriefPrevention.WorldGuardWrapper;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
-import me.ryanhamshire.GriefPrevention.events.ClaimCreatedEvent;
 import me.ryanhamshire.GriefPrevention.events.ClaimDeletedEvent;
 import me.ryanhamshire.GriefPrevention.events.ClaimPermissionCheckEvent;
 import me.ryanhamshire.GriefPrevention.events.ClaimTransferEvent;
@@ -57,6 +56,7 @@ import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 import static me.ryanhamshire.GriefPrevention.config.ConfigLoader.creativeRulesApply;
 
 @IocBean
@@ -64,7 +64,7 @@ public class ClaimService {
 
     //in-memory cache for claim data
     public ArrayList<Claim> claims = new ArrayList<>();
-    ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<>();
 
     private final DataStore dataStore;
     private final BukkitUtils bukkitUtils;
@@ -75,7 +75,12 @@ public class ClaimService {
     //world guard reference, if available
     private WorldGuardWrapper worldGuard = null;
 
-    public ClaimService(DataStore dataStore, BukkitUtils bukkitUtils, GroupBonusBlocksService groupBonusBlocksService, ClaimBlockService claimBlockService, ClaimFactory claimFactory, ClaimRepository claimRepository) {
+    public ClaimService(DataStore dataStore,
+                        BukkitUtils bukkitUtils,
+                        GroupBonusBlocksService groupBonusBlocksService,
+                        ClaimBlockService claimBlockService,
+                        ClaimFactory claimFactory,
+                        ClaimRepository claimRepository) {
         this.dataStore = dataStore;
         this.bukkitUtils = bukkitUtils;
         this.groupBonusBlocksService = groupBonusBlocksService;
@@ -106,17 +111,17 @@ public class ClaimService {
         //which claim is being abandoned?
         Claim claim = getClaimAt(player.getLocation(), true /*ignore height*/, null);
         if (claim == null) {
-            MessageService.sendMessage(player, TextMode.Instr, Messages.AbandonClaimMissing);
+            sendMessage(player, TextMode.Instr, Messages.AbandonClaimMissing);
         }
 
         //verify ownership
         else if (checkPermission(claim, player, ClaimPermission.Edit, null) != null) {
-            MessageService.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
+            sendMessage(player, TextMode.Err, Messages.NotYourClaim);
         }
 
         //warn if has children and we're not explicitly deleting a top level claim
         else if (claim.children.size() > 0 && !deleteTopLevelClaim) {
-            MessageService.sendMessage(player, TextMode.Instr, Messages.DeleteTopLevelClaim);
+            sendMessage(player, TextMode.Instr, Messages.DeleteTopLevelClaim);
             return true;
         } else {
             //delete it
@@ -126,7 +131,7 @@ public class ClaimService {
             //if in a creative mode world, restore the claim area
             if (creativeRulesApply(claim.getLesserBoundaryCorner())) {
                 GriefPrevention.AddLogEntry(player.getName() + " abandoned a claim @ " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()));
-                MessageService.sendMessage(player, TextMode.Warn, Messages.UnclaimCleanupWarning);
+                sendMessage(player, TextMode.Warn, Messages.UnclaimCleanupWarning);
                 restoreClaim(claim, 20L * 60 * 2);
             }
 
@@ -137,7 +142,7 @@ public class ClaimService {
 
             //tell the player how many claim blocks he has left
             int remainingBlocks = claimBlockService.getRemainingClaimBlocks(playerData, getClaims(player.getUniqueId(), player.getName()));
-            MessageService.sendMessage(player, TextMode.Success, Messages.AbandonSuccess, String.valueOf(remainingBlocks));
+            sendMessage(player, TextMode.Success, Messages.AbandonSuccess, String.valueOf(remainingBlocks));
 
             bukkitUtils.runTaskLater(player, () -> Visualization.Revert(player, playerData));
 
@@ -215,7 +220,7 @@ public class ClaimService {
 
         event.setDenialReason(defaultDenial);
 
-        Bukkit.getPluginManager().callEvent(event);
+        BukkitUtils.sendEvent(event);
 
         return event.getDenialReason();
     }
@@ -282,10 +287,6 @@ public class ClaimService {
 
     public String allowBreak(Player player, Block block, Location location) {
         return this.allowBreak(player, block, location, new BlockBreakEvent(block, player));
-    }
-
-    public String allowBreak(Player player, Material material, Location location, BlockBreakEvent breakEvent) {
-        return this.allowBreak(player, location.getBlock(), location, breakEvent);
     }
 
     public String allowBreak(Player player, Block block, Location location, BlockBreakEvent breakEvent) {
@@ -603,7 +604,7 @@ public class ClaimService {
         return chunksToClaimsMap;
     }
 
-    synchronized public CreateClaimResult createClaim(World world, int x1, int x2, int y1, int y2, int z1, int z2, UUID ownerID, Claim parent, Long id, Player creatingPlayer, boolean dryRun) {
+    public CreateClaimResult createClaim(World world, int x1, int x2, int y1, int y2, int z1, int z2, UUID ownerID, Claim parent, Integer id, Player creatingPlayer, boolean dryRun) {
         Claim newClaim = claimFactory.create(world, x1, x2, y1, y2, z1, z2, ownerID, parent, id);
         CreateClaimResult result = new CreateClaimResult();
         //ensure this new claim won't overlap any existing claims
@@ -638,14 +639,13 @@ public class ClaimService {
             result.claim = newClaim;
             return result;
         }
-        claimRepository.assignClaimID(newClaim);
-        ClaimCreatedEvent event = new ClaimCreatedEvent(newClaim, creatingPlayer);
-        Bukkit.getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            result.succeeded = false;
-            result.claim = null;
-            return result;
-        }
+//        ClaimCreatedEvent event = new ClaimCreatedEvent(newClaim, creatingPlayer);
+//        Bukkit.getPluginManager().callEvent(event);
+//        if (event.isCancelled()) {
+//            result.succeeded = false;
+//            result.claim = null;
+//            return result;
+//        }
         //otherwise add this new claim to the data store to make it effective
         claimRepository.addClaim(newClaim, true);
 

@@ -2,7 +2,6 @@ package me.ryanhamshire.GriefPrevention.claims;
 
 import be.garagepoort.mcioc.IocBean;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
 import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -26,14 +25,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @IocBean
 public class ClaimRepository {
 
-    private static final String SQL_SET_NEXT_CLAIM_ID = "INSERT INTO griefprevention_nextclaimid VALUES (?)";
-    private static final String SQL_DELETE_NEXT_CLAIM_ID = "DELETE FROM griefprevention_nextclaimid";
-    private static final String SQL_INSERT_CLAIM = "INSERT INTO griefprevention_claimdata (id, owner, lessercorner, greatercorner, builders, containers, accessors, managers, inheritnothing, parentid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private static final String SQL_INSERT_CLAIM = "INSERT INTO griefprevention_claimdata (owner, lessercorner, greatercorner, builders, containers, accessors, managers, inheritnothing, parentid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     private static final String SQL_DELETE_CLAIM = "DELETE FROM griefprevention_claimdata WHERE id = ?";
     private final String locationStringDelimiter = ";";
-
-    //next claim ID
-    Long nextClaimID = (long) 0;
 
     private final ArrayList<Claim> claims = new ArrayList<>();
     private final ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<>();
@@ -48,12 +42,11 @@ public class ClaimRepository {
         this.claimRowMapper = claimRowMapper;
 
         GriefPrevention.AddLogEntry(this.claims.size() + " total claims loaded.");
-
-        loadNextClaimId(sqlConnectionProvider);
     }
 
     private void loadClaimData() {
-        try (Statement statement = sqlConnectionProvider.getConnection().createStatement()) {
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             Statement statement = connection.createStatement()) {
             ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_claimdata");
 
             ArrayList<Claim> claimsToRemove = new ArrayList<>();
@@ -64,7 +57,7 @@ public class ClaimRepository {
                 try {
                     long parentId = results.getLong("parentid");
                     Optional<Claim> claim = claimRowMapper.map(results);
-                    if(claim.isEmpty()) {
+                    if (claim.isEmpty()) {
                         continue;
                     }
 
@@ -101,31 +94,6 @@ public class ClaimRepository {
             }
         } catch (SQLException e) {
             e.printStackTrace();
-        }
-    }
-
-    private void loadNextClaimId(SqlConnectionProvider sqlConnectionProvider) {
-        try (Statement statement = sqlConnectionProvider.getConnection().createStatement()) {
-            //load next claim number into memory
-            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid");
-            //if there's nothing yet, add it
-            if (!results.next()) {
-                statement.execute("INSERT INTO griefprevention_nextclaimid VALUES (0)");
-                this.nextClaimID = (long) 0;
-            } else {
-                this.nextClaimID = results.getLong("nextid");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        //RoboMWM: ensure the nextClaimID is greater than any other claim ID. If not, data corruption occurred (out of storage space, usually).
-        for (Claim claim : this.claims) {
-            if (claim.id >= nextClaimID) {
-                GriefPrevention.instance.getLogger().severe("nextClaimID was lesser or equal to an already-existing claim ID!\n" +
-                    "This usually happens if you ran out of storage space.");
-                GriefPrevention.AddLogEntry("Changing nextClaimID from " + nextClaimID + " to " + claim.id, CustomLogEntryTypes.Debug, false);
-                nextClaimID = claim.id + 1;
-            }
         }
     }
 
@@ -172,16 +140,16 @@ public class ClaimRepository {
     }
 
     public void saveClaim(Claim claim) {
-        assignClaimID(claim);
-
         this.writeClaimToStorage(claim);
     }
 
     synchronized void writeClaimToStorage(Claim claim)  //see datastore.cs.  this will ALWAYS be a top level claim
     {
         try {
-            //wipe out any existing data about this claim
-            this.deleteClaimFromSecondaryStorage(claim);
+            //wipe out any existing data about this
+            if (claim.id != null) {
+                this.deleteClaimFromSecondaryStorage(claim);
+            }
 
             //write claim data to the database
             this.writeClaimData(claim);
@@ -193,7 +161,7 @@ public class ClaimRepository {
     }
 
     //actually writes claim data to the database
-    synchronized private void writeClaimData(Claim claim) throws SQLException {
+    private void writeClaimData(Claim claim) throws SQLException {
         String lesserCornerString = this.locationToString(claim.getLesserBoundaryCorner());
         String greaterCornerString = this.locationToString(claim.getGreaterBoundaryCorner());
         String owner = "";
@@ -213,19 +181,26 @@ public class ClaimRepository {
         boolean inheritNothing = claim.getSubclaimRestrictions();
         long parentId = claim.parent == null ? -1 : claim.parent.id;
 
-        try (PreparedStatement insertStmt = sqlConnectionProvider.getConnection().prepareStatement(SQL_INSERT_CLAIM)) {
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             PreparedStatement insertStmt = connection.prepareStatement(SQL_INSERT_CLAIM, Statement.RETURN_GENERATED_KEYS)) {
 
-            insertStmt.setLong(1, claim.id);
-            insertStmt.setString(2, owner);
-            insertStmt.setString(3, lesserCornerString);
-            insertStmt.setString(4, greaterCornerString);
-            insertStmt.setString(5, buildersString);
-            insertStmt.setString(6, containersString);
-            insertStmt.setString(7, accessorsString);
-            insertStmt.setString(8, managersString);
-            insertStmt.setBoolean(9, inheritNothing);
-            insertStmt.setLong(10, parentId);
+            insertStmt.setString(1, owner);
+            insertStmt.setString(2, lesserCornerString);
+            insertStmt.setString(3, greaterCornerString);
+            insertStmt.setString(4, buildersString);
+            insertStmt.setString(5, containersString);
+            insertStmt.setString(6, accessorsString);
+            insertStmt.setString(7, managersString);
+            insertStmt.setBoolean(8, inheritNothing);
+            insertStmt.setLong(9, parentId);
             insertStmt.executeUpdate();
+
+            ResultSet generatedKeys = insertStmt.getGeneratedKeys();
+            int generatedKey = -1;
+            if (generatedKeys.next()) {
+                generatedKey = generatedKeys.getInt(1);
+            }
+            claim.id = generatedKey;
         } catch (SQLException e) {
             GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
@@ -246,40 +221,12 @@ public class ClaimRepository {
     }
 
     public synchronized void deleteClaimFromSecondaryStorage(Claim claim) {
-        try (PreparedStatement deleteStmnt = sqlConnectionProvider.getConnection().prepareStatement(SQL_DELETE_CLAIM)) {
-            deleteStmnt.setLong(1, claim.id);
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_CLAIM)) {
+            deleteStmnt.setInt(1, claim.id);
             deleteStmnt.executeUpdate();
         } catch (SQLException e) {
             GriefPrevention.AddLogEntry("Unable to delete data for claim " + claim.id + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
-            throw new DatabaseException(e.getCause());
-        }
-    }
-
-    public synchronized void assignClaimID(Claim claim) {
-        //ensure a unique identifier for the claim which will be used to name the file on disk
-        if (claim.id == null || claim.id == -1) {
-            claim.id = this.nextClaimID;
-            this.incrementNextClaimID();
-        }
-    }
-
-    synchronized void incrementNextClaimID() {
-        this.setNextClaimID(this.nextClaimID + 1);
-    }
-
-    //sets the next claim ID.  used by incrementNextClaimID() above, and also while migrating data from a flat file data store
-    synchronized void setNextClaimID(long nextID) {
-        this.nextClaimID = nextID;
-
-        try (Connection databaseConnection = sqlConnectionProvider.getConnection();
-             PreparedStatement deleteStmnt = databaseConnection.prepareStatement(SQL_DELETE_NEXT_CLAIM_ID);
-             PreparedStatement insertStmnt = databaseConnection.prepareStatement(SQL_SET_NEXT_CLAIM_ID)) {
-            deleteStmnt.execute();
-            insertStmnt.setLong(1, nextID);
-            insertStmnt.executeUpdate();
-        } catch (SQLException e) {
-            GriefPrevention.AddLogEntry("Unable to set next claim ID to " + nextID + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
             throw new DatabaseException(e.getCause());
         }
@@ -342,5 +289,4 @@ public class ClaimRepository {
         //if no claim found, return null
         return null;
     }
-
 }

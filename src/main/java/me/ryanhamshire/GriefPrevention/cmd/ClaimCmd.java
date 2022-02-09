@@ -7,7 +7,6 @@ import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.CreateClaimResult;
 import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
-import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
@@ -30,6 +29,8 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Vector;
+
+import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 
 @IocBean
 @IocCommandHandler("claim")
@@ -54,7 +55,7 @@ public class ClaimCmd extends AbstractCmd {
         Player player = (Player) sender;
 
         if (!GriefPrevention.instance.claimsEnabledForWorld(player.getWorld())) {
-            MessageService.sendMessage(player, TextMode.Err, Messages.ClaimsDisabledWorld);
+            sendMessage(player, TextMode.Err, Messages.ClaimsDisabledWorld);
             return true;
         }
 
@@ -67,7 +68,7 @@ public class ClaimCmd extends AbstractCmd {
             if (ConfigLoader.config_claims_maxClaimsPerPlayer > 0 &&
                 !player.hasPermission("griefprevention.overrideclaimcountlimit") &&
                 claims.size() >= ConfigLoader.config_claims_maxClaimsPerPlayer) {
-                MessageService.sendMessage(player, TextMode.Err, Messages.ClaimCreationFailedOverClaimCountLimit);
+                sendMessage(player, TextMode.Err, Messages.ClaimCreationFailedOverClaimCountLimit);
                 return;
             }
 
@@ -79,7 +80,7 @@ public class ClaimCmd extends AbstractCmd {
             if (claims.size() > 0) {
                 //if player has exactly one land claim, this requires the claim modification tool to be in hand (or creative mode player)
                 if (claims.size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != ConfigLoader.config_claims_modificationTool) {
-                    MessageService.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
+                    sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                     return;
                 }
 
@@ -89,7 +90,7 @@ public class ClaimCmd extends AbstractCmd {
             //allow for specifying the radius
             if (args.length > 0) {
                 if (claims.size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != ConfigLoader.config_claims_modificationTool) {
-                    MessageService.sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
+                    sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
                     return;
                 }
 
@@ -97,12 +98,12 @@ public class ClaimCmd extends AbstractCmd {
                 try {
                     specifiedRadius = Integer.parseInt(args[0]);
                 } catch (NumberFormatException e) {
-                    MessageService.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
+                    sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
                     return;
                 }
 
                 if (specifiedRadius < radius) {
-                    MessageService.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
+                    sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
                     return;
                 }
                 radius = specifiedRadius;
@@ -117,7 +118,7 @@ public class ClaimCmd extends AbstractCmd {
             int area = Math.abs((gc.getBlockX() - lc.getBlockX() + 1) * (gc.getBlockZ() - lc.getBlockZ() + 1));
             int remaining = claimBlockService.getRemainingClaimBlocks(playerData, claims);
             if (remaining < area) {
-                MessageService.sendMessage(player, TextMode.Err, Messages.CreateClaimInsufficientBlocks, String.valueOf(area - remaining));
+                sendMessage(player, TextMode.Err, Messages.CreateClaimInsufficientBlocks, String.valueOf(area - remaining));
                 HelperUtil.tryAdvertiseAdminAlternatives(player);
                 return;
             }
@@ -131,22 +132,23 @@ public class ClaimCmd extends AbstractCmd {
                 false);
             if (!result.succeeded) {
                 if (result.claim != null) {
-                    MessageService.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapShort);
+                    sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapShort);
 
                     Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.ErrorClaim, player.getLocation());
                     Visualization.Apply(player, playerData, visualization);
                 } else {
-                    MessageService.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapRegion);
+                    sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapRegion);
                 }
             } else {
-                MessageService.sendMessage(player, TextMode.Success, Messages.CreateClaimSuccess);
+                sendMessage(player, TextMode.Success, Messages.CreateClaimSuccess);
 
                 //link to a video demo of land claiming, based on world type
                 if (ConfigLoader.creativeRulesApply(player.getLocation())) {
-                    MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                    sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
                 } else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
-                    MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                    sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
+
                 Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation());
                 Visualization.Apply(player, playerData, visualization);
                 playerData.claimResizing = null;

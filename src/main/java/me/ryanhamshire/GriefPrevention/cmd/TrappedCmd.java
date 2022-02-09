@@ -59,27 +59,29 @@ public class TrappedCmd extends AbstractCmd {
                 return;
             }
 
-            //rescue destination may be set by GPFlags or other plugin, ask to find out
-            SaveTrappedPlayerEvent event = new SaveTrappedPlayerEvent(claim);
-            Bukkit.getPluginManager().callEvent(event);
+            bukkitUtils.runTaskLater(sender, () -> {
+                //rescue destination may be set by GPFlags or other plugin, ask to find out
+                SaveTrappedPlayerEvent event = new SaveTrappedPlayerEvent(claim);
+                BukkitUtils.sendEventOnThisTick(event);
 
-            //if the player is in the nether or end, he's screwed (there's no way to programmatically find a safe place for him)
-            if (player.getWorld().getEnvironment() != World.Environment.NORMAL && event.getDestination() == null) {
-                MessageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
-                return;
-            }
+                //if the player is in the nether or end, he's screwed (there's no way to programmatically find a safe place for him)
+                if (player.getWorld().getEnvironment() != World.Environment.NORMAL && event.getDestination() == null) {
+                    MessageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
+                    return;
+                }
 
-            //if the player is in an administrative claim and AllowTrappedInAdminClaims is false, he should contact an admin
-            if (!ConfigLoader.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null) {
-                MessageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
-                return;
-            }
-            //send instructions
-            MessageService.sendMessage(player, TextMode.Instr, Messages.RescuePending);
+                //if the player is in an administrative claim and AllowTrappedInAdminClaims is false, he should contact an admin
+                if (!ConfigLoader.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null) {
+                    MessageService.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
+                    return;
+                }
+                //send instructions
+                MessageService.sendMessage(player, TextMode.Instr, Messages.RescuePending);
 
-            //create a task to rescue this player in a little while
-            PlayerRescueTask task = new PlayerRescueTask(player, player.getLocation(), event.getDestination(), dataStore, playerRescueService);
-            Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 200L);  //20L ~ 1 second
+                //create a task to rescue this player in a little while
+                PlayerRescueTask task = new PlayerRescueTask(player, player.getLocation(), event.getDestination(), dataStore, playerRescueService);
+                Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 200L);  //20L ~ 1 second
+            });
         });
 
         return true;

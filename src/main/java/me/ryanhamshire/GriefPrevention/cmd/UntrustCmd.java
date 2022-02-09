@@ -4,7 +4,6 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.ClaimPermission;
-import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -21,15 +20,10 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("untrust")
 public class UntrustCmd extends AbstractCmd {
-    private final DataStore dataStore;
-    private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
     private final ClaimRepository claimRepository;
 
-    public UntrustCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimRepository claimRepository) {
-        this.dataStore = dataStore;
-        this.bukkitUtils = bukkitUtils;
-
+    public UntrustCmd(ClaimService claimService, ClaimRepository claimRepository) {
         this.claimService = claimService;
         this.claimRepository = claimRepository;
     }
@@ -134,7 +128,7 @@ public class UntrustCmd extends AbstractCmd {
 
                 //calling the event
                 TrustChangedEvent event = new TrustChangedEvent(player, claim, null, false, args[0]);
-                Bukkit.getPluginManager().callEvent(event);
+                BukkitUtils.sendEventOnThisTick(event);
 
                 if (event.isCancelled()) {
                     return true;

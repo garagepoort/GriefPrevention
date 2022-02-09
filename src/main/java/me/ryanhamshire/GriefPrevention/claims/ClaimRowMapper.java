@@ -25,7 +25,7 @@ public class ClaimRowMapper {
         List<World> validWorlds = Bukkit.getServer().getWorlds();
 
         long parentId = results.getLong("parentid");
-        Long claimID = results.getLong("id");
+        Integer claimID = results.getInt("id");
         boolean inheritNothing = results.getBoolean("inheritNothing");
         Location lesserBoundaryCorner = null;
         Location greaterBoundaryCorner = null;

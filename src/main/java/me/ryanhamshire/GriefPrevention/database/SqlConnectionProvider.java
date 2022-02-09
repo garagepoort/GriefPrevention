@@ -32,10 +32,10 @@ public class SqlConnectionProvider {
     private void getDataSource() {
         if (datasource == null) {
             HikariConfig config = new HikariConfig();
-            config.setJdbcUrl(ConfigLoader.databaseUrl);
+            config.setJdbcUrl("jdbc:mysql://" + ConfigLoader.databaseHost + ":" + ConfigLoader.databasePort + "/" + ConfigLoader.databaseName + "?autoReconnect=true&&allowMultiQueries=true&allowPublicKeyRetrieval=true");
             config.setUsername(ConfigLoader.databaseUserName);
             config.setPassword(ConfigLoader.databasePassword);
-            config.setMaximumPoolSize(5);
+            config.setMaximumPoolSize(10);
             config.setLeakDetectionThreshold(5000);
             config.setAutoCommit(true);
             config.setDriverClassName("com.mysql.jdbc.Driver");

@@ -33,10 +33,10 @@ public class PlayerData {
     public UUID playerID;
 
     public Vector<Claim> claims = null;
-    public Integer accruedClaimBlocks = null;
+    public int accruedClaimBlocks;
     public int newlyAccruedClaimBlocks = 0;
     public Location lastAfkCheckLocation = null;
-    public Integer bonusClaimBlocks = null;
+    public int bonusClaimBlocks;
     public ShovelMode shovelMode = ShovelMode.Basic;
     public int fillRadius = 0;
     public Location lastShovelLocation = null;
@@ -62,7 +62,7 @@ public class PlayerData {
 
     private int AccruedClaimBlocksLimit = -1;
 
-    boolean receivedDropUnlockAdvertisement = false;
+    public boolean receivedDropUnlockAdvertisement = false;
 
     //whether or not this player's dropped items (on death) are unlocked for other players to pick up
     public boolean dropsAreUnlocked = false;
@@ -78,7 +78,7 @@ public class PlayerData {
 
     //spot where a player can't talk, used to mute new players until they've moved a little
     //this is an anti-bot strategy.
-    Location noChatLocation = null;
+    public Location noChatLocation = null;
 
     //ignore list
     //true means invisible (admin-forced ignore), false means player-created ignore
@@ -87,6 +87,10 @@ public class PlayerData {
 
     //profanity warning, once per play session
     boolean profanityWarned = false;
+
+    public PlayerData(UUID playerID) {
+        this.playerID = playerID;
+    }
 
     //whether or not this player is "in" pvp combat
     public boolean inPvpCombat() {

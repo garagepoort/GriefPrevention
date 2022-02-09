@@ -132,8 +132,6 @@ public class ConfigLoader {
     public static boolean config_signNotifications;                        //whether sign content will broadcast to administrators in game
     public static ArrayList<String> config_eavesdrop_whisperCommands;        //list of whisper commands to eavesdrop on
 
-    public static boolean config_smartBan;                                    //whether to ban accounts which very likely owned by a banned player
-
     public static boolean config_endermenMoveBlocks;                        //whether or not endermen may move blocks around
     public static boolean config_claims_ravagersBreakBlocks;                //whether or not ravagers may break blocks in claims
     public static boolean config_silverfishBreakBlocks;                    //whether silverfish may break blocks
@@ -168,7 +166,9 @@ public class ConfigLoader {
     public static boolean config_ban_useCommand;
     public static String config_ban_commandFormat;
 
-    public static String databaseUrl;
+    public static String databaseHost;
+    public static String databasePort;
+    public static String databaseName;
     public static String databaseUserName;
     public static String databasePassword;
 
@@ -378,7 +378,6 @@ public class ConfigLoader {
         String whisperCommandsToMonitor = config.getString("GriefPrevention.WhisperCommands", "/tell;/pm;/r;/whisper;/msg");
         whisperCommandsToMonitor = config.getString("GriefPrevention.Spam.WhisperSlashCommands", whisperCommandsToMonitor);
 
-        config_smartBan = config.getBoolean("GriefPrevention.SmartBan", true);
         config_trollFilterEnabled = config.getBoolean("GriefPrevention.Mute New Players Using Banned Words", true);
         config_ipLimit = config.getInt("GriefPrevention.MaxPlayersPerIpAddress", 3);
         config_silenceBans = config.getBoolean("GriefPrevention.SilenceBans", true);
@@ -493,7 +492,9 @@ public class ConfigLoader {
         config_pvp_protectPets = config.getBoolean("GriefPrevention.PvP.ProtectPetsOutsideLandClaims", false);
 
         //optional database settings
-        databaseUrl = config.getString("GriefPrevention.Database.URL", "");
+        databaseName = config.getString("GriefPrevention.Database.Name", "");
+        databaseHost = config.getString("GriefPrevention.Database.Host", "");
+        databasePort = config.getString("GriefPrevention.Database.Port", "3306");
         databaseUserName = config.getString("GriefPrevention.Database.UserName", "");
         databasePassword = config.getString("GriefPrevention.Database.Password", "");
 
@@ -613,7 +614,6 @@ public class ConfigLoader {
         outConfig.set("GriefPrevention.AdminsGetWhispers", config_whisperNotifications);
         outConfig.set("GriefPrevention.AdminsGetSignNotifications", config_signNotifications);
 
-        outConfig.set("GriefPrevention.SmartBan", config_smartBan);
         outConfig.set("GriefPrevention.Mute New Players Using Banned Words", config_trollFilterEnabled);
         outConfig.set("GriefPrevention.MaxPlayersPerIpAddress", config_ipLimit);
         outConfig.set("GriefPrevention.SilenceBans", config_silenceBans);
@@ -628,7 +628,9 @@ public class ConfigLoader {
         outConfig.set("GriefPrevention.RabbitsEatCrops", config_rabbitsEatCrops);
         outConfig.set("GriefPrevention.HardModeZombiesBreakDoors", config_zombiesBreakDoors);
 
-        outConfig.set("GriefPrevention.Database.URL", databaseUrl);
+        outConfig.set("GriefPrevention.Database.Name", databaseName);
+        outConfig.set("GriefPrevention.Database.Host", databaseHost);
+        outConfig.set("GriefPrevention.Database.Port", databasePort);
         outConfig.set("GriefPrevention.Database.UserName", databaseUserName);
         outConfig.set("GriefPrevention.Database.Password", databasePassword);
 

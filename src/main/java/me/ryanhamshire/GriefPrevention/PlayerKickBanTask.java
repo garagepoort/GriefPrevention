@@ -25,7 +25,7 @@ import org.bukkit.entity.Player;
 //kicks or bans a player
 //need a task for this because async threads (like the chat event handlers) can't kick or ban.
 //but they CAN schedule a task to run in the main thread to do that job
-class PlayerKickBanTask implements Runnable
+public class PlayerKickBanTask implements Runnable
 {
     //player to kick or ban
     private final Player player;

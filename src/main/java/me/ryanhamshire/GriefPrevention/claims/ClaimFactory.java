@@ -16,7 +16,7 @@ import java.util.UUID;
 @IocBean
 public class ClaimFactory {
 
-    public Claim create(World world, int x1, int x2, int y1, int y2, int z1, int z2, UUID ownerID, Claim parent, Long id) {
+    public Claim create(World world, int x1, int x2, int y1, int y2, int z1, int z2, UUID ownerID, Claim parent, Integer id) {
         CreateClaimResult result = new CreateClaimResult();
 
         int smallx, bigx, smally, bigy, smallz, bigz;

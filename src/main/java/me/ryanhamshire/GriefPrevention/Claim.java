@@ -58,7 +58,7 @@ public class Claim
     public Date modifiedDate;
 
     //id number.  unique to this claim, never changes.
-    public Long id = null;
+    public Integer id = null;
 
     //ownerID.  for admin claims, this is NULL
     //use getOwnerName() to get a friendly name (will be "an administrator" for admin claims)
@@ -103,7 +103,7 @@ public class Claim
     }
 
     //accessor for ID
-    public Long getID()
+    public Integer getID()
     {
         return this.id;
     }
@@ -196,7 +196,7 @@ public class Claim
     }
 
     //main constructor.  note that only creating a claim instance does nothing - a claim must be added to the data store to be effective
-    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Long id)
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Integer id)
     {
         //modification date
         this.modifiedDate = Calendar.getInstance().getTime();
@@ -238,7 +238,7 @@ public class Claim
         this.inheritNothing = inheritNothing;
     }
 
-    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Long id)
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Integer id)
     {
         this(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderIDs, containerIDs, accessorIDs, managerIDs, false, id);
     }

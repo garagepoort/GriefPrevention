@@ -27,9 +27,11 @@ import me.ryanhamshire.GriefPrevention.claims.ResizeClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.events.ClaimInspectionEvent;
 import me.ryanhamshire.GriefPrevention.events.VisualizationEvent;
+import me.ryanhamshire.GriefPrevention.sessions.LogoutMessagesService;
+import me.ryanhamshire.GriefPrevention.sessions.NotificationService;
+import me.ryanhamshire.GriefPrevention.sessions.SessionManager;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import me.ryanhamshire.GriefPrevention.util.HelperUtil;
-import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
@@ -83,7 +85,6 @@ import org.bukkit.event.player.PlayerInteractAtEntityEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerLoginEvent.Result;
@@ -101,10 +102,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.BlockIterator;
 
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
@@ -129,7 +128,6 @@ public class PlayerEventHandler implements Listener {
 
     private final ArrayList<IpBanInfo> tempBannedIps = new ArrayList<>();
     private final long MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
-    private final ArrayList<Long> recentLoginLogoutNotifications = new ArrayList<>();
     private Pattern howToClaimPattern = null;
     private final WordFinder bannedWordFinder;
     private final SpamDetector spamDetector = new SpamDetector();
@@ -138,8 +136,11 @@ public class PlayerEventHandler implements Listener {
     private final ClaimBlockService claimBlockService;
     private final ResizeClaimService resizeClaimService;
     private final ClaimRepository claimRepository;
+    private final SessionManager sessionManager;
+    private final NotificationService notificationService;
+    private final LogoutMessagesService logoutMessagesService;
 
-    public PlayerEventHandler(DataStore dataStore, PvpProtectionService pvpProtectionService, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, ClaimRepository claimRepository) {
+    public PlayerEventHandler(DataStore dataStore, PvpProtectionService pvpProtectionService, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, ClaimRepository claimRepository, SessionManager sessionManager, NotificationService notificationService, LogoutMessagesService logoutMessagesService) {
         this.dataStore = dataStore;
         bannedWordFinder = new WordFinder(dataStore.loadBannedWords());
         this.pvpProtectionService = pvpProtectionService;
@@ -149,6 +150,9 @@ public class PlayerEventHandler implements Listener {
         this.claimBlockService = claimBlockService;
         this.resizeClaimService = resizeClaimService;
         this.claimRepository = claimRepository;
+        this.sessionManager = sessionManager;
+        this.notificationService = notificationService;
+        this.logoutMessagesService = logoutMessagesService;
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
@@ -552,8 +556,6 @@ public class PlayerEventHandler implements Listener {
         GriefPrevention.AddLogEntry(entryBuilder.toString(), CustomLogEntryTypes.SocialActivity, true);
     }
 
-    private final ConcurrentHashMap<UUID, Date> lastLoginThisServerSessionMap = new ConcurrentHashMap<>();
-
     //when a player attempts to join the server...
     @EventHandler(priority = EventPriority.HIGHEST)
     void onPlayerLogin(PlayerLoginEvent event) {
@@ -567,7 +569,7 @@ public class PlayerEventHandler implements Listener {
             //if allowed to join and login cooldown enabled
             if (ConfigLoader.config_spam_loginCooldownSeconds > 0 && event.getResult() == Result.ALLOWED && !player.hasPermission("griefprevention.spam")) {
                 //determine how long since last login and cooldown remaining
-                Date lastLoginThisSession = lastLoginThisServerSessionMap.get(player.getUniqueId());
+                Date lastLoginThisSession = sessionManager.getSessionDate(player.getUniqueId());
                 if (lastLoginThisSession != null) {
                     long millisecondsSinceLastLogin = now - lastLoginThisSession.getTime();
                     long secondsSinceLastLogin = millisecondsSinceLastLogin / 1000;
@@ -583,176 +585,11 @@ public class PlayerEventHandler implements Listener {
                     }
                 }
             }
-
-            //if logging-in account is banned, remember IP address for later
-            if (ConfigLoader.config_smartBan && event.getResult() == Result.KICK_BANNED) {
-                this.tempBannedIps.add(new IpBanInfo(event.getAddress(), now + this.MILLISECONDS_IN_DAY, player.getName()));
-            }
         }
 
         //remember the player's ip address
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
         playerData.ipAddress = event.getAddress();
-    }
-
-    //when a player successfully joins the server...
-
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
-    void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        UUID playerID = player.getUniqueId();
-
-        //note login time
-        Date nowDate = new Date();
-        long now = nowDate.getTime();
-        PlayerData playerData = this.dataStore.getPlayerData(playerID);
-        playerData.lastSpawn = now;
-        this.lastLoginThisServerSessionMap.put(playerID, nowDate);
-
-        //if newish, prevent chat until he's moved a bit to prove he's not a bot
-        if (isNewToServer(player)) {
-            playerData.noChatLocation = player.getLocation();
-        }
-
-        //if player has never played on the server before...
-        if (!player.hasPlayedBefore()) {
-            //may need pvp protection
-            pvpProtectionService.checkPvpProtectionNeeded(player, GriefPrevention.isInventoryEmpty(player));
-
-            //if in survival claims mode, send a message about the claim basics video (except for admins - assumed experts)
-            if (ConfigLoader.config_claims_worldModes.get(player.getWorld()) == ClaimsMode.Survival && !player.hasPermission("griefprevention.adminclaims") && this.claimService.getClaims().size() > 10) {
-                WelcomeTask task = new WelcomeTask(player);
-                Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, ConfigLoader.config_claims_manualDeliveryDelaySeconds * 20L);
-            }
-        }
-
-        //silence notifications when they're coming too fast
-        if (event.getJoinMessage() != null && this.shouldSilenceNotification()) {
-            event.setJoinMessage(null);
-        }
-
-        //FEATURE: auto-ban accounts who use an IP address which was very recently used by another banned account
-        if (ConfigLoader.config_smartBan && !player.hasPlayedBefore()) {
-            //search temporarily banned IP addresses for this one
-            for (int i = 0; i < this.tempBannedIps.size(); i++) {
-                IpBanInfo info = this.tempBannedIps.get(i);
-                String address = info.address.toString();
-
-                //eliminate any expired entries
-                if (now > info.expirationTimestamp) {
-                    this.tempBannedIps.remove(i--);
-                }
-
-                //if we find a match
-                else if (address.equals(playerData.ipAddress.toString())) {
-                    //if the account associated with the IP ban has been pardoned, remove all ip bans for that ip and we're done
-                    OfflinePlayer bannedPlayer = GriefPrevention.get().getServer().getOfflinePlayer(info.bannedAccountName);
-                    if (!bannedPlayer.isBanned()) {
-                        for (int j = 0; j < this.tempBannedIps.size(); j++) {
-                            IpBanInfo info2 = this.tempBannedIps.get(j);
-                            if (info2.address.toString().equals(address)) {
-                                OfflinePlayer bannedAccount = GriefPrevention.get().getServer().getOfflinePlayer(info2.bannedAccountName);
-                                GriefPrevention.get().getServer().getBanList(BanList.Type.NAME).pardon(bannedAccount.getName());
-                                this.tempBannedIps.remove(j--);
-                            }
-                        }
-
-                        break;
-                    }
-
-                    //otherwise if that account is still banned, ban this account, too
-                    else {
-                        GriefPrevention.AddLogEntry("Auto-banned new player " + player.getName() + " because that account is using an IP address very recently used by banned player " + info.bannedAccountName + " (" + info.address.toString() + ").", CustomLogEntryTypes.AdminActivity);
-
-                        //notify any online ops
-                        @SuppressWarnings("unchecked")
-                        Collection<Player> players = (Collection<Player>) GriefPrevention.get().getServer().getOnlinePlayers();
-                        for (Player otherPlayer : players) {
-                            if (otherPlayer.isOp()) {
-                                MessageService.sendMessage(otherPlayer, TextMode.Success, Messages.AutoBanNotify, player.getName(), info.bannedAccountName);
-                            }
-                        }
-
-                        //ban player
-                        PlayerKickBanTask task = new PlayerKickBanTask(player, "", "GriefPrevention Smart Ban - Shared Login:" + info.bannedAccountName, true);
-                        GriefPrevention.get().getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 10L);
-
-                        //silence join message
-                        event.setJoinMessage("");
-
-                        break;
-                    }
-                }
-            }
-        }
-
-        //in case player has changed his name, on successful login, update UUID > Name mapping
-        GriefPrevention.cacheUUIDNamePair(player.getUniqueId(), player.getName());
-
-        //ensure we're not over the limit for this IP address
-        InetAddress ipAddress = playerData.ipAddress;
-        if (ipAddress != null) {
-            int ipLimit = ConfigLoader.config_ipLimit;
-            if (ipLimit > 0 && isNewToServer(player)) {
-                int ipCount = 0;
-
-                @SuppressWarnings("unchecked")
-                Collection<Player> players = (Collection<Player>) GriefPrevention.get().getServer().getOnlinePlayers();
-                for (Player onlinePlayer : players) {
-                    if (onlinePlayer.getUniqueId().equals(player.getUniqueId())) continue;
-
-                    PlayerData otherData = dataStore.getPlayerData(onlinePlayer.getUniqueId());
-                    if (ipAddress.equals(otherData.ipAddress) && isNewToServer(onlinePlayer)) {
-                        ipCount++;
-                    }
-                }
-
-                if (ipCount >= ipLimit) {
-                    //kick player
-                    PlayerKickBanTask task = new PlayerKickBanTask(player, MessageService.getMessage(Messages.TooMuchIpOverlap), "GriefPrevention IP-sharing limit.", false);
-                    GriefPrevention.get().getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 100L);
-
-                    //silence join message
-                    event.setJoinMessage(null);
-                    return;
-                }
-            }
-        }
-
-        //create a thread to load ignore information
-        new IgnoreLoaderThread(playerID, playerData.ignoredPlayers).start();
-
-        //is he stuck in a portal frame?
-        if (player.hasMetadata("GP_PORTALRESCUE")) {
-            //If so, let him know and rescue him in 10 seconds. If he is in fact not trapped, hopefully chunks will have loaded by this time so he can walk out.
-            MessageService.sendMessage(player, TextMode.Info, Messages.NetherPortalTrapDetectionMessage, 20L);
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    if (player.getPortalCooldown() > 8 && player.hasMetadata("GP_PORTALRESCUE")) {
-                        GriefPrevention.AddLogEntry("Rescued " + player.getName() + " from a nether portal.\nTeleported from " + player.getLocation().toString() + " to " + ((Location) player.getMetadata("GP_PORTALRESCUE").get(0).value()).toString(), CustomLogEntryTypes.Debug);
-                        player.teleport((Location) player.getMetadata("GP_PORTALRESCUE").get(0).value());
-                        player.removeMetadata("GP_PORTALRESCUE", GriefPrevention.get());
-                    }
-                }
-            }.runTaskLater(GriefPrevention.get(), 200L);
-        }
-        //Otherwise just reset cooldown, just in case they happened to logout again...
-        else
-            player.setPortalCooldown(0);
-
-        //if we're holding a logout message for this player, don't send that or this event's join message
-        if (ConfigLoader.config_spam_logoutMessageDelaySeconds > 0) {
-            String joinMessage = event.getJoinMessage();
-            if (joinMessage != null && !joinMessage.isEmpty()) {
-                Integer taskID = this.heldLogoutMessages.get(player.getUniqueId());
-                if (taskID != null && Bukkit.getScheduler().isQueued(taskID)) {
-                    Bukkit.getScheduler().cancelTask(taskID);
-                    player.sendMessage(event.getJoinMessage());
-                    event.setJoinMessage("");
-                }
-            }
-        }
     }
 
     //when a player spawns, conditionally apply temporary pvp protection
@@ -805,9 +642,6 @@ public class PlayerEventHandler implements Listener {
         playerData.wasKicked = true;
     }
 
-    //when a player quits...
-    private final HashMap<UUID, Integer> heldLogoutMessages = new HashMap<>();
-
     @EventHandler(priority = EventPriority.HIGHEST)
     void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
@@ -834,7 +668,7 @@ public class PlayerEventHandler implements Listener {
         }
 
         //silence notifications when they're coming too fast
-        if (event.getQuitMessage() != null && this.shouldSilenceNotification()) {
+        if (event.getQuitMessage() != null && notificationService.shouldSilenceNotification()) {
             event.setQuitMessage(null);
         }
 
@@ -870,36 +704,12 @@ public class PlayerEventHandler implements Listener {
             if (quitMessage != null && !quitMessage.isEmpty()) {
                 BroadcastMessageTask task = new BroadcastMessageTask(quitMessage);
                 int taskID = Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 20L * ConfigLoader.config_spam_logoutMessageDelaySeconds);
-                this.heldLogoutMessages.put(playerID, taskID);
+                this.logoutMessagesService.addMessage(playerID, taskID);
                 event.setQuitMessage("");
             }
         }
     }
 
-    //determines whether or not a login or logout notification should be silenced, depending on how many there have been in the last minute
-    private boolean shouldSilenceNotification() {
-        if (ConfigLoader.config_spam_loginLogoutNotificationsPerMinute <= 0) {
-            return false; // not silencing login/logout notifications
-        }
-
-        final long ONE_MINUTE = 60000;
-        Long now = Calendar.getInstance().getTimeInMillis();
-
-        //eliminate any expired entries (longer than a minute ago)
-        for (int i = 0; i < this.recentLoginLogoutNotifications.size(); i++) {
-            Long notificationTimestamp = this.recentLoginLogoutNotifications.get(i);
-            if (now - notificationTimestamp > ONE_MINUTE) {
-                this.recentLoginLogoutNotifications.remove(i--);
-            } else {
-                break;
-            }
-        }
-
-        //add the new entry
-        this.recentLoginLogoutNotifications.add(now);
-
-        return this.recentLoginLogoutNotifications.size() > ConfigLoader.config_spam_loginLogoutNotificationsPerMinute;
-    }
 
     //when a player drops an item
     @EventHandler(priority = EventPriority.LOWEST)

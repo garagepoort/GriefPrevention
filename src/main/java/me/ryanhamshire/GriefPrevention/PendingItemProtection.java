@@ -5,7 +5,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.UUID;
 
-class PendingItemProtection
+public class PendingItemProtection
 {
     public Location location;
     public UUID owner;

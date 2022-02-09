@@ -52,7 +52,7 @@ public class GriefPrevention extends TubingPlugin {
     EntityEventHandler entityEventHandler;
 
     //this tracks item stacks expected to drop which will need protection
-    ArrayList<PendingItemProtection> pendingItemWatchList = new ArrayList<>();
+    public ArrayList<PendingItemProtection> pendingItemWatchList = new ArrayList<>();
 
     //log entry manager for GP's custom log files
     CustomLogger customLogger;
@@ -181,7 +181,7 @@ public class GriefPrevention extends TubingPlugin {
     }
 
     //cache for player name lookups, to save searches of all offline players
-    static void cacheUUIDNamePair(UUID playerID, String playerName) {
+    public static void cacheUUIDNamePair(UUID playerID, String playerName) {
         //store the reverse mapping
         GriefPrevention.instance.playerNameToIDMap.put(playerName, playerID);
         GriefPrevention.instance.playerNameToIDMap.put(playerName.toLowerCase(), playerID);
@@ -205,7 +205,7 @@ public class GriefPrevention extends TubingPlugin {
         AddLogEntry("GriefPrevention disabled.");
     }
 
-    static boolean isInventoryEmpty(Player player) {
+    public static boolean isInventoryEmpty(Player player) {
         PlayerInventory inventory = player.getInventory();
         ItemStack[] armorStacks = inventory.getArmorContents();
 

@@ -32,6 +32,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -91,7 +92,6 @@ public abstract class DataStore {
 
         //load list of soft mutes
         this.loadSoftMutes();
-
     }
 
     private void loadSoftMutes() {
@@ -211,22 +211,15 @@ public abstract class DataStore {
     abstract void saveGroupBonusBlocks(String groupName, int amount);
 
     public PlayerData getPlayerData(UUID playerID) {
-        //first, look in memory
-        PlayerData playerData = this.playerNameToPlayerDataMap.get(playerID);
-
-        //if not there, build a fresh instance with some blanks for what may be in secondary storage
-        if (playerData == null) {
-            playerData = new PlayerData();
-            playerData.playerID = playerID;
-
-            //shove that new player data into the hash map cache
-            this.playerNameToPlayerDataMap.put(playerID, playerData);
+        if (this.playerNameToPlayerDataMap.containsKey(playerID)) {
+            return playerNameToPlayerDataMap.get(playerID);
         }
-
+        PlayerData playerData = getPlayerDataFromStorage(playerID).orElseGet(() -> new PlayerData(playerID));
+        this.playerNameToPlayerDataMap.put(playerID, playerData);
         return playerData;
     }
 
-    abstract PlayerData getPlayerDataFromStorage(UUID playerID);
+    abstract Optional<PlayerData> getPlayerDataFromStorage(UUID playerID);
 
     //saves changes to player data to secondary storage.  MUST be called after you're done making changes, otherwise a reload will lose them
     public void savePlayerDataSync(UUID playerID, PlayerData playerData) {

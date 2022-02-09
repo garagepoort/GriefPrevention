@@ -34,7 +34,7 @@ public class DeliverClaimBlocksTask extends BukkitRunnable {
         this.dataStore = dataStore;
         this.idleThresholdSquared = ConfigLoader.config_claims_accruedIdleThreshold * ConfigLoader.config_claims_accruedIdleThreshold;
 
-        Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(GriefPrevention.get(), this, 20L * 60 * 10, 20L * 60 * 10);
+        runTaskTimer(GriefPrevention.get(), 20L * 60 * 10, 20L * 60 * 10);
     }
 
     @Override

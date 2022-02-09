@@ -22,7 +22,6 @@ import be.garagepoort.mcioc.IocBean;
 import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
-import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Collections;
@@ -53,7 +52,7 @@ public class FindUnusedClaimsTask extends BukkitRunnable
         this.claimBlockService = claimBlockService;
         this.claimService = claimService;
         refreshUUIDs();
-        Bukkit.getScheduler().scheduleSyncRepeatingTask(GriefPrevention.get(), this, 20L * 60, 20L * ConfigLoader.config_advanced_claim_expiration_check_rate);
+        runTaskTimer(GriefPrevention.get(), 20L * 60, 20L * ConfigLoader.config_advanced_claim_expiration_check_rate);
 
     }
 
