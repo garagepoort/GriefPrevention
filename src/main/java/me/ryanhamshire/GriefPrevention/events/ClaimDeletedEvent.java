@@ -14,14 +14,21 @@ import org.jetbrains.annotations.NotNull;
 public class ClaimDeletedEvent extends ClaimEvent
 {
 
+    private final boolean releasePets;
+
     /**
      * Construct a new {@code ClaimDeletedEvent}.
      *
      * @param claim the {@link Claim} being deleted
      */
-    public ClaimDeletedEvent(@NotNull Claim claim)
+    public ClaimDeletedEvent(@NotNull Claim claim, boolean releasePets)
     {
         super(claim);
+        this.releasePets = releasePets;
+    }
+
+    public boolean isReleasePets() {
+        return releasePets;
     }
 
     // Listenable event requirements

@@ -66,6 +66,7 @@ public class Claim
 
     //list of players who (beyond the claim owner) have permission to grant permissions in this claim
     public ArrayList<String> managers = new ArrayList<>();
+    public long parentId;
 
     //permissions for this claim, see ClaimPermission class
     private HashMap<String, ClaimPermission> playerIDToClaimPermissionMap = new HashMap<>();
@@ -87,7 +88,7 @@ public class Claim
 
     //children (subdivisions)
     //note subdivisions themselves never have children
-    public ArrayList<Claim> children = new ArrayList<>();
+    public List<Claim> children = new ArrayList<>();
 
     //information about a siege involving this claim.  null means no siege is impacting this claim
     public SiegeData siegeData = null;
@@ -317,6 +318,14 @@ public class Claim
     public static boolean placeableForFarming(Material material)
     {
         return PLACEABLE_FARMING_BLOCKS.contains(material);
+    }
+
+    public void setChildren(List<Claim> children) {
+        this.children = children;
+        for (Claim child : this.children) {
+            child.parentId = this.id;
+            child.parent = this;
+        }
     }
 
     public static class CompatBuildBreakEvent extends Event

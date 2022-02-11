@@ -27,8 +27,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
-import java.util.Vector;
 
 import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 
@@ -63,7 +63,7 @@ public class ClaimCmd extends AbstractCmd {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
             //if he's at the claim count per player limit already and doesn't have permission to bypass, display an error message
-            Vector<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
+            List<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
 
             if (ConfigLoader.config_claims_maxClaimsPerPlayer > 0 &&
                 !player.hasPermission("griefprevention.overrideclaimcountlimit") &&

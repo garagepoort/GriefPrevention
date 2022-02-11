@@ -304,7 +304,6 @@ public abstract class DataStore {
         public void run() {
             //ensure player data is already read from file before trying to save
             playerData.getAccruedClaimBlocks();
-            playerData.getClaims();
             asyncSavePlayerData(this.playerID, this.playerData);
         }
     }

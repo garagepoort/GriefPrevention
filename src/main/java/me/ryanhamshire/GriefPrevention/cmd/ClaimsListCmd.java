@@ -17,7 +17,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.Vector;
+import java.util.List;
 
 @IocBean
 @IocCommandHandler("claimslist")
@@ -66,7 +66,7 @@ public class ClaimsListCmd extends AbstractCmd {
 
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
-            Vector<Claim> claims = claimService.getClaims(otherPlayer.getUniqueId(), otherPlayer.getName());
+            List<Claim> claims = claimService.getClaims(otherPlayer.getUniqueId(), otherPlayer.getName());
             MessageService.sendMessage(player, TextMode.Instr, Messages.StartBlockMath,
                 String.valueOf(claimBlockService.recalculateAccruedClaimBlocks(playerData)),
                 String.valueOf((playerData.getBonusClaimBlocks() + groupBonusBlocksService.getGroupBonusBlocks(otherPlayer.getUniqueId()))),

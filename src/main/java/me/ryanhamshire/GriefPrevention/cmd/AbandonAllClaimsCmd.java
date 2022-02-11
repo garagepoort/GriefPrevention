@@ -16,7 +16,7 @@ import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.Vector;
+import java.util.List;
 
 @IocBean
 @IocCommandHandler("abandonallclaims")
@@ -48,7 +48,7 @@ public class AbandonAllClaimsCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
-            Vector<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
+            List<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
             int originalClaimCount = claims.size();
 
             //check count
@@ -61,10 +61,19 @@ public class AbandonAllClaimsCmd extends AbstractCmd {
                 claims.forEach(claim -> playerData.setAccruedClaimBlocks(claimBlockService.recalculateAccruedClaimBlocks(playerData) - (int) Math.ceil((claim.getArea() * (1 - ConfigLoader.config_claims_abandonReturnRatio)))));
             }
 
-            claimService.deleteClaimsForPlayer(player.getUniqueId(), false);
+            List<Claim> claimsDeleted = claimService.deleteClaimsForPlayer(player.getUniqueId(), false);
             int remainingBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claims);
             MessageService.sendMessage(player, TextMode.Success, Messages.SuccessfulAbandon, String.valueOf(remainingBlocks));
-            bukkitUtils.runTaskLater(player, () -> Visualization.Revert(player, playerData));
+
+            bukkitUtils.runTaskLater(player, () -> {
+                for (Claim claim : claimsDeleted) {
+                    claim.removeSurfaceFluids(null);
+                    if (ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner())) {
+                        claimService.restoreClaim(claim, 0);
+                    }
+                }
+                Visualization.Revert(player, playerData);
+            });
         });
 
         return true;

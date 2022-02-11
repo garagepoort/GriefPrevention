@@ -2,130 +2,89 @@ package me.ryanhamshire.GriefPrevention.claims;
 
 import be.garagepoort.mcioc.IocBean;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
-import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.database.DatabaseException;
 import me.ryanhamshire.GriefPrevention.database.SqlConnectionProvider;
 import me.ryanhamshire.GriefPrevention.util.HelperUtil;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @IocBean
 public class ClaimRepository {
 
     private static final String SQL_INSERT_CLAIM = "INSERT INTO griefprevention_claimdata (owner, lessercorner, greatercorner, builders, containers, accessors, managers, inheritnothing, parentid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     private static final String SQL_DELETE_CLAIM = "DELETE FROM griefprevention_claimdata WHERE id = ?";
-    private final String locationStringDelimiter = ";";
 
-    private final ArrayList<Claim> claims = new ArrayList<>();
+    private final List<Claim> claims;
     private final ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<>();
 
-    private final DataStore dataStore;
     private final SqlConnectionProvider sqlConnectionProvider;
     private final ClaimRowMapper claimRowMapper;
 
-    public ClaimRepository(DataStore dataStore, SqlConnectionProvider sqlConnectionProvider, ClaimRowMapper claimRowMapper) {
-        this.dataStore = dataStore;
+    public ClaimRepository(SqlConnectionProvider sqlConnectionProvider, ClaimRowMapper claimRowMapper) {
         this.sqlConnectionProvider = sqlConnectionProvider;
         this.claimRowMapper = claimRowMapper;
-
+        this.claims = getAllClaims();
         GriefPrevention.AddLogEntry(this.claims.size() + " total claims loaded.");
-    }
-
-    private void loadClaimData() {
-        try (Connection connection = sqlConnectionProvider.getConnection();
-             Statement statement = connection.createStatement()) {
-            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_claimdata");
-
-            ArrayList<Claim> claimsToRemove = new ArrayList<>();
-            ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
-            List<World> validWorlds = Bukkit.getServer().getWorlds();
-
-            while (results.next()) {
-                try {
-                    long parentId = results.getLong("parentid");
-                    Optional<Claim> claim = claimRowMapper.map(results);
-                    if (claim.isEmpty()) {
-                        continue;
-                    }
-
-                    if (parentId == -1) {
-                        this.addClaim(claim.get(), false);
-                    } else {
-                        subdivisionsToLoad.add(claim.get());
-                    }
-                } catch (SQLException e) {
-                    GriefPrevention.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
-                    throw new DatabaseException(e.getCause());
-                }
-            }
-
-            //add subdivisions to their parent claims
-            for (Claim childClaim : subdivisionsToLoad) {
-                //find top level claim parent
-                Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), true, null);
-
-                if (topLevelClaim == null) {
-                    claimsToRemove.add(childClaim);
-                    GriefPrevention.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
-                    continue;
-                }
-
-                //add this claim to the list of children of the current top level claim
-                childClaim.parent = topLevelClaim;
-                topLevelClaim.children.add(childClaim);
-                childClaim.inDataStore = true;
-            }
-
-            for (Claim claim : claimsToRemove) {
-                this.deleteClaimFromSecondaryStorage(claim);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
     }
 
     //adds a claim to the datastore, making it an effective claim
     public void addClaim(Claim newClaim, boolean writeToStorage) {
         //subdivisions are added under their parent, not directly to the hash map for direct search
+        addClaimToCache(newClaim);
+
+        if (writeToStorage) {
+            this.writeClaimToStorage(newClaim);
+        }
+    }
+
+    public ConcurrentHashMap<Long, ArrayList<Claim>> getChunksToClaimsMap() {
+        return chunksToClaimsMap;
+    }
+
+    private void addClaimToCache(Claim newClaim) {
         if (newClaim.parent != null) {
             if (!newClaim.parent.children.contains(newClaim)) {
                 newClaim.parent.children.add(newClaim);
             }
-            newClaim.inDataStore = true;
-            if (writeToStorage) {
-                this.saveClaim(newClaim);
+        } else {
+            //add it and mark it as added
+            if(!claims.contains(newClaim)) {
+                this.claims.add(newClaim);
             }
-            return;
+            addToChunkClaimMap(newClaim);
         }
+    }
 
-        //add it and mark it as added
-        this.claims.add(newClaim);
-        addToChunkClaimMap(newClaim);
-
-        newClaim.inDataStore = true;
-
-        //except for administrative claims (which have no owner), update the owner's playerData with the new claim
-        if (!newClaim.isAdminClaim() && writeToStorage) {
-            PlayerData ownerData = dataStore.getPlayerData(newClaim.ownerID);
-            ownerData.addClaim(newClaim);
-        }
-
-        //make sure the claim is saved to disk
-        if (writeToStorage) {
-            this.saveClaim(newClaim);
+    public void removeFromChunkClaimMap(Claim claim) {
+        ArrayList<Long> chunkHashes = claim.getChunkHashes();
+        for (Long chunkHash : chunkHashes) {
+            ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkHash);
+            if (claimsInChunk != null) {
+                for (Iterator<Claim> it = claimsInChunk.iterator(); it.hasNext(); ) {
+                    Claim c = it.next();
+                    if (c.id.equals(claim.id)) {
+                        it.remove();
+                        break;
+                    }
+                }
+                if (claimsInChunk.isEmpty()) { // if nothing's left, remove this chunk's cache
+                    this.chunksToClaimsMap.remove(chunkHash);
+                }
+            }
         }
     }
 
@@ -141,6 +100,7 @@ public class ClaimRepository {
 
     public void saveClaim(Claim claim) {
         this.writeClaimToStorage(claim);
+        addClaimToCache(claim);
     }
 
     synchronized void writeClaimToStorage(Claim claim)  //see datastore.cs.  this will ALWAYS be a top level claim
@@ -153,6 +113,7 @@ public class ClaimRepository {
 
             //write claim data to the database
             this.writeClaimData(claim);
+            claim.inDataStore = true;
         } catch (SQLException e) {
             GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
@@ -210,6 +171,7 @@ public class ClaimRepository {
 
     private String locationToString(Location location) {
         StringBuilder stringBuilder = new StringBuilder(location.getWorld().getName());
+        String locationStringDelimiter = ";";
         stringBuilder.append(locationStringDelimiter);
         stringBuilder.append(location.getBlockX());
         stringBuilder.append(locationStringDelimiter);
@@ -247,22 +209,10 @@ public class ClaimRepository {
         return getClaimAt(location, ignoreHeight, false, cachedClaim);
     }
 
-    /**
-     * Get the claim at a specific location.
-     *
-     * <p>The cached claim may be null, but will increase performance if you have a reasonable idea
-     * of which claim is correct.
-     *
-     * @param location        the location
-     * @param ignoreHeight    whether or not to check containment vertically
-     * @param ignoreSubclaims whether or not subclaims should be returned over claims
-     * @param cachedClaim     the cached claim, if any
-     * @return the claim containing the location or null if no claim exists there
-     */
     synchronized public Claim getClaimAt(Location location, boolean ignoreHeight, boolean ignoreSubclaims, Claim cachedClaim) {
-        //check cachedClaim guess first.  if it's in the datastore and the location is inside it, we're done
-        if (cachedClaim != null && cachedClaim.inDataStore && cachedClaim.contains(location, ignoreHeight, !ignoreSubclaims))
-            return cachedClaim;
+//        //check cachedClaim guess first.  if it's in the datastore and the location is inside it, we're done
+//        if (cachedClaim != null && cachedClaim.inDataStore && cachedClaim.contains(location, ignoreHeight, !ignoreSubclaims))
+//            return cachedClaim;
 
         //find a top level claim
         Long chunkID = HelperUtil.getChunkHash(location);
@@ -288,5 +238,95 @@ public class ClaimRepository {
 
         //if no claim found, return null
         return null;
+    }
+
+    public List<Claim> getAllClaimsForPlayer(UUID playerId) {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement selectParentClaims = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid = ?");
+             PreparedStatement selectSubdivisions = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid != ?")) {
+            selectParentClaims.setString(1, playerId.toString());
+            selectParentClaims.setInt(2, -1);
+            selectSubdivisions.setString(1, playerId.toString());
+            selectSubdivisions.setInt(2, -1);
+
+            return loadClaims(selectParentClaims, selectSubdivisions);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    public List<Claim> getAllAdminClaims() {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement selectParentClaims = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid = ?");
+             PreparedStatement selectSubdivisions = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid != ?")) {
+            selectParentClaims.setNull(1, Types.VARCHAR);
+            selectParentClaims.setInt(2, -1);
+            selectSubdivisions.setNull(1, Types.VARCHAR);
+            selectSubdivisions.setInt(2, -1);
+
+            return loadClaims(selectParentClaims, selectSubdivisions);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    public List<Claim> getAllClaims() {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement selectParentClaims = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE parentid = ?");
+             PreparedStatement selectSubdivisions = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE parentid != ?")) {
+            selectParentClaims.setInt(1, -1);
+            selectSubdivisions.setInt(1, -1);
+
+            return loadClaims(selectParentClaims, selectSubdivisions);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    private List<Claim> loadClaims(PreparedStatement selectParentClaims, PreparedStatement selectSubdivisions) throws SQLException {
+        List<Claim> parentClaims = new ArrayList<>();
+        try (ResultSet rs = selectParentClaims.executeQuery()) {
+            while (rs.next()) {
+                claimRowMapper.map(rs).ifPresent(parentClaims::add);
+            }
+        }
+
+        List<Claim> subDivisions = new ArrayList<>();
+        try (ResultSet rs = selectSubdivisions.executeQuery()) {
+            while (rs.next()) {
+                claimRowMapper.map(rs).ifPresent(subDivisions::add);
+            }
+        }
+
+        for (Claim parentClaim : parentClaims) {
+            parentClaim.setChildren(subDivisions.stream().filter(s -> s.parentId == parentClaim.id).collect(Collectors.toList()));
+        }
+        return parentClaims;
+    }
+
+    public void deleteAllClaimsForPlayer(UUID playerID) {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement insert = sql.prepareStatement("DELETE FROM griefprevention_claimdata WHERE owner = ?");) {
+            insert.setString(1, playerID.toString());
+            insert.executeUpdate();
+            claims.removeIf(c -> Objects.equals(playerID, c.ownerID));
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    public void deleteAdminClaims() {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement insert = sql.prepareStatement("DELETE FROM griefprevention_claimdata WHERE owner = ?");) {
+            insert.setNull(1, Types.VARCHAR);
+            insert.executeUpdate();
+            claims.removeIf(c -> c.ownerID == null);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    public List<Claim> getClaims() {
+        return claims;
     }
 }

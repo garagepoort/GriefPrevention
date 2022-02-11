@@ -33,7 +33,7 @@ public class AdminClaimsListCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
             //find admin claims
             Vector<Claim> claims = new Vector<>();
-            for (Claim claim : this.claimService.claims) {
+            for (Claim claim : this.claimService.getClaims()) {
                 if (claim.ownerID == null)  //admin claim
                 {
                     claims.add(claim);

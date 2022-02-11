@@ -25,14 +25,12 @@ import org.bukkit.OfflinePlayer;
 import java.net.InetAddress;
 import java.util.Calendar;
 import java.util.UUID;
-import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 
 //holds all of GriefPrevention's player-tied data
 public class PlayerData {
     public UUID playerID;
 
-    public Vector<Claim> claims = null;
     public int accruedClaimBlocks;
     public int newlyAccruedClaimBlocks = 0;
     public Location lastAfkCheckLocation = null;
@@ -139,17 +137,5 @@ public class PlayerData {
 
     public void accrueBlocks(int howMany) {
         this.newlyAccruedClaimBlocks += howMany;
-    }
-
-    public void addClaim(Claim claim) {
-        this.claims.add(claim);
-    }
-
-    public void removeClaim(Claim claim) {
-        this.claims.remove(claim);
-    }
-
-    public Vector<Claim> getClaims() {
-        return claims;
     }
 }

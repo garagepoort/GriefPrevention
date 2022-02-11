@@ -70,6 +70,7 @@ public class ClaimRowMapper {
         List<String> managerNames = Arrays.asList(managersString.split(";"));
         managerNames = this.convertNameListToUUIDList(managerNames);
         Claim claim = new Claim(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderNames, containerNames, accessorNames, managerNames, inheritNothing, claimID);
+        claim.parentId = parentId;
         return Optional.of(claim);
     }
 

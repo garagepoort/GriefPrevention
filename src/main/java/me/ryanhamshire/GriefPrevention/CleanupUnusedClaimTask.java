@@ -26,6 +26,7 @@ import org.bukkit.OfflinePlayer;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Vector;
 
 class CleanupUnusedClaimTask implements Runnable {
@@ -84,12 +85,12 @@ class CleanupUnusedClaimTask implements Runnable {
                     return;
 
                 //delete them
-                claimService.deleteClaimsForPlayer(claim.ownerID, true);
+                List<Claim> deletedClaims = claimService.deleteClaimsForPlayer(claim.ownerID, true);
                 GriefPrevention.AddLogEntry(" All of " + claim.getOwnerName() + "'s claims have expired.", CustomLogEntryTypes.AdminActivity);
                 GriefPrevention.AddLogEntry("earliestPermissibleLastLogin#getTime: " + earliestPermissibleLastLogin.getTime(), CustomLogEntryTypes.Debug, true);
                 GriefPrevention.AddLogEntry("ownerInfo#getLastPlayed: " + ownerInfo.getLastPlayed(), CustomLogEntryTypes.Debug, true);
 
-                for (Claim claim : claims) {
+                for (Claim claim : deletedClaims) {
                     //if configured to do so, restore the land to natural
                     if (ConfigLoader.creativeRulesApply(claim.getLesserBoundaryCorner()) || ConfigLoader.config_claims_survivalAutoNatureRestoration) {
                         claimService.restoreClaim(claim, 0);

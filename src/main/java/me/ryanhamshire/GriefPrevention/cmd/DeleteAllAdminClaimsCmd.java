@@ -40,7 +40,7 @@ public class DeleteAllAdminClaimsCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
             PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
             //delete all admin claims
-            claimService.deleteClaimsForPlayer(null, true);  //null for owner id indicates an administrative claim
+            claimService.deleteAdminClaims( true);  //null for owner id indicates an administrative claim
 
             MessageService.sendMessage(player, TextMode.Success, Messages.AllAdminDeleted);
             GriefPrevention.AddLogEntry(player.getName() + " deleted all administrative claims.", CustomLogEntryTypes.AdminActivity);

@@ -20,9 +20,9 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.Vector;
 import java.util.stream.Stream;
 
 @IocBean
@@ -64,7 +64,7 @@ public class ResizeClaimService {
 
             //make sure player has enough blocks to make up the difference
             if (!playerData.claimResizing.isAdminClaim() && player.getName().equals(ownerName)) {
-                Vector<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
+                List<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
                 int newArea = newWidth * newHeight;
                 int blocksRemainingAfter = claimBlockService.getRemainingClaimBlocks(playerData, claims) + playerData.claimResizing.getArea() - newArea;
 
@@ -176,7 +176,7 @@ public class ResizeClaimService {
 
         //if succeeded
         if (result.succeeded) {
-            claimService.removeFromChunkClaimMap(claim); // remove the old boundary from the chunk cache
+            claimRepository.removeFromChunkClaimMap(claim); // remove the old boundary from the chunk cache
             // copy the boundary from the claim created in the dry run of createClaim() to our existing claim
             claim.lesserBoundaryCorner = result.claim.lesserBoundaryCorner;
             claim.greaterBoundaryCorner = result.claim.greaterBoundaryCorner;
@@ -184,7 +184,7 @@ public class ResizeClaimService {
             // Also saves affected claims.
             setNewDepth(claim, claim.getLesserBoundaryCorner().getBlockY());
             result.claim = claim;
-            claimService.addToChunkClaimMap(claim); // add the new boundary to the chunk cache
+            claimRepository.addToChunkClaimMap(claim); // add the new boundary to the chunk cache
         }
 
         return result;
