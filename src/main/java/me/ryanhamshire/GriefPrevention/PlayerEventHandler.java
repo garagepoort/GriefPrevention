@@ -1267,13 +1267,12 @@ public class PlayerEventHandler implements Listener {
             clickedBlockType = Material.AIR;
         }
 
-        PlayerData playerData = null;
+        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
         //Turtle eggs
         if (action == Action.PHYSICAL) {
             if (clickedBlockType != Material.TURTLE_EGG)
                 return;
-            playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
             if (claim != null) {
                 playerData.lastClaim = claim;
@@ -1293,7 +1292,6 @@ public class PlayerEventHandler implements Listener {
                 Block adjacentBlock = clickedBlock.getRelative(event.getBlockFace());
                 byte lightLevel = adjacentBlock.getLightFromBlocks();
                 if (lightLevel == 15 && adjacentBlock.getType() == Material.FIRE) {
-                    if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
                     Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
                     if (claim != null) {
                         playerData.lastClaim = claim;
@@ -1342,7 +1340,6 @@ public class PlayerEventHandler implements Listener {
                     Tag.CANDLES.isTagged(clickedBlockType) ||
                     Tag.CANDLE_CAKES.isTagged(clickedBlockType)
             ))) {
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
             //block container use while under siege, so players can't hide items from attackers
             if (playerData.siegeData != null) {
@@ -1391,7 +1388,6 @@ public class PlayerEventHandler implements Listener {
                 ConfigLoader.config_claims_lecternReadingRequiresAccessTrust && clickedBlockType == Material.LECTERN ||
 
                 ConfigLoader.config_claims_lockFenceGates && Tag.FENCE_GATES.isTagged(clickedBlockType))) {
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
             if (claim != null) {
                 playerData.lastClaim = claim;
@@ -1407,7 +1403,6 @@ public class PlayerEventHandler implements Listener {
 
         //otherwise apply rules for buttons and switches
         else if (clickedBlock != null && ConfigLoader.config_claims_preventButtonsSwitches && (Tag.BUTTONS.isTagged(clickedBlockType) || clickedBlockType == Material.LEVER)) {
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
             if (claim != null) {
                 playerData.lastClaim = claim;
@@ -1423,7 +1418,6 @@ public class PlayerEventHandler implements Listener {
 
         //otherwise apply rule for cake
         else if (clickedBlock != null && ConfigLoader.config_claims_preventTheft && (clickedBlockType == Material.CAKE || Tag.CANDLE_CAKES.isTagged(clickedBlockType))) {
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
             if (claim != null) {
                 playerData.lastClaim = claim;
@@ -1448,7 +1442,6 @@ public class PlayerEventHandler implements Listener {
                     clickedBlockType == Material.REDSTONE_WIRE ||
                     Tag.FLOWER_POTS.isTagged(clickedBlockType)
             )) {
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
             if (claim != null) {
                 Supplier<String> noBuildReason = claimService.checkPermission(claim, player, ClaimPermission.Build, event);

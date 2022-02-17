@@ -4,7 +4,6 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.ClaimPermission;
 import me.ryanhamshire.GriefPrevention.TrustService;
-import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -12,11 +11,9 @@ import org.bukkit.entity.Player;
 @IocCommandHandler("accesstrust")
 public class AccessTrustCmd extends AbstractCmd {
     private final TrustService trustService;
-    private final BukkitUtils bukkitUtils;
 
-    public AccessTrustCmd(TrustService trustService, BukkitUtils bukkitUtils) {
+    public AccessTrustCmd(TrustService trustService) {
         this.trustService = trustService;
-        this.bukkitUtils = bukkitUtils;
     }
 
     @Override
@@ -24,7 +21,7 @@ public class AccessTrustCmd extends AbstractCmd {
         validateIsPlayer(sender);
         Player player = (Player) sender;
         if (args.length != 1) return false;
-        bukkitUtils.runTaskAsync(sender, () -> trustService.handleTrust(player, ClaimPermission.Access, args[0]));
+        trustService.handleTrust(player, ClaimPermission.Access, args[0]);
 
         return true;
     }

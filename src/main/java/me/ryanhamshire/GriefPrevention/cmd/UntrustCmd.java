@@ -12,7 +12,6 @@ import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.events.TrustChangedEvent;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -76,7 +75,7 @@ public class UntrustCmd extends AbstractCmd {
 
             //calling event
             TrustChangedEvent event = new TrustChangedEvent(player, claimService.getClaims(player.getUniqueId(), player.getName()), null, false, idToDrop);
-            Bukkit.getPluginManager().callEvent(event);
+            BukkitUtils.sendEventOnThisTick(event);
 
             if (event.isCancelled()) {
                 return true;
@@ -152,7 +151,7 @@ public class UntrustCmd extends AbstractCmd {
                 } else {
                     //calling the event
                     TrustChangedEvent event = new TrustChangedEvent(player, claim, null, false, idToDrop);
-                    Bukkit.getPluginManager().callEvent(event);
+                    BukkitUtils.sendEventOnThisTick(event);
 
                     if (event.isCancelled()) {
                         return true;

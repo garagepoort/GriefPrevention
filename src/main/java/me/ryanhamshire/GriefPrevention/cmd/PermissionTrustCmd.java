@@ -23,7 +23,7 @@ public class PermissionTrustCmd extends AbstractCmd {
         validateIsPlayer(sender);
         Player player = (Player) sender;
         if (args.length != 1) return false;
-        bukkitUtils.runTaskAsync(sender, () -> trustService.handleTrust(player, null, args[0]));
+        trustService.handleTrust(player, null, args[0]);
 
         return true;
     }
