@@ -71,6 +71,7 @@ public class ClaimRowMapper {
         managerNames = this.convertNameListToUUIDList(managerNames);
         Claim claim = new Claim(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderNames, containerNames, accessorNames, managerNames, inheritNothing, claimID);
         claim.parentId = parentId;
+        claim.inDataStore = true;
         return Optional.of(claim);
     }
 

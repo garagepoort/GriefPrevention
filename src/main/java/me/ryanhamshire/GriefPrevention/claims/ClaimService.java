@@ -416,6 +416,7 @@ public class ClaimService {
     }
 
     public void deleteClaim(Claim claim, boolean fireEvent, boolean releasePets) {
+        claimRepository.deleteClaimFromSecondaryStorage(claim);
         claimRepository.removeFromChunkClaimMap(claim);
         if (fireEvent) {
             ClaimDeletedEvent ev = new ClaimDeletedEvent(claim, releasePets);

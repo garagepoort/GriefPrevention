@@ -13,7 +13,6 @@ import me.ryanhamshire.GriefPrevention.TextMode;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import java.util.UUID;
 
@@ -32,8 +31,6 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
 
     @Override
     protected boolean executeCmd(CommandSender sender, String alias, String[] args) {
-        validateIsPlayer(sender);
-        Player player = (Player) sender;
         //requires exactly two parameters, the other player or group's name and the adjustment
         if (args.length != 2) return false;
 
@@ -52,9 +49,9 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
                 String permissionIdentifier = args[0].substring(1, args[0].length() - 1);
                 int newTotal = groupBonusBlocksService.adjustGroupBonusBlocks(permissionIdentifier, adjustment);
 
-                MessageService.sendMessage(player, TextMode.Success, Messages.AdjustGroupBlocksSuccess, permissionIdentifier, String.valueOf(adjustment), String.valueOf(newTotal));
-                if (player != null)
-                    GriefPrevention.AddLogEntry(player.getName() + " adjusted " + permissionIdentifier + "'s bonus claim blocks by " + adjustment + ".");
+                MessageService.sendMessage(sender, TextMode.Success, Messages.AdjustGroupBlocksSuccess, permissionIdentifier, String.valueOf(adjustment), String.valueOf(newTotal));
+                if (sender != null)
+                    GriefPrevention.AddLogEntry(sender.getName() + " adjusted " + permissionIdentifier + "'s bonus claim blocks by " + adjustment + ".");
                 return;
             }
 
@@ -68,7 +65,7 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
             }
 
             if (targetPlayer == null) {
-                MessageService.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                MessageService.sendMessage(sender, TextMode.Err, Messages.PlayerNotFound2);
                 return;
             }
 
@@ -77,9 +74,9 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
             playerData.setBonusClaimBlocks(playerData.getBonusClaimBlocks() + adjustment);
             this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
 
-            MessageService.sendMessage(player, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
-            if (player != null)
-                GriefPrevention.AddLogEntry(player.getName() + " adjusted " + targetPlayer.getName() + "'s bonus claim blocks by " + adjustment + ".", CustomLogEntryTypes.AdminActivity);
+            MessageService.sendMessage(sender, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
+            if (sender != null)
+                GriefPrevention.AddLogEntry(sender.getName() + " adjusted " + targetPlayer.getName() + "'s bonus claim blocks by " + adjustment + ".", CustomLogEntryTypes.AdminActivity);
         });
 
         return true;

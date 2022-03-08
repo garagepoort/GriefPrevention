@@ -38,6 +38,39 @@ public class ClaimRepository {
         this.sqlConnectionProvider = sqlConnectionProvider;
         this.claimRowMapper = claimRowMapper;
         this.claims = getAllClaims();
+        //load claims data into memory
+
+        ArrayList<Claim> claimsToRemove = new ArrayList<>();
+        ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
+
+        for (Claim claim : claims) {
+            if (claim.parentId == -1) {
+                this.addClaim(claim, false);
+            } else {
+                subdivisionsToLoad.add(claim);
+            }
+        }
+
+        //add subdivisions to their parent claims
+        for (Claim childClaim : subdivisionsToLoad) {
+            //find top level claim parent
+            Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), true, null);
+
+            if (topLevelClaim == null) {
+                claimsToRemove.add(childClaim);
+                GriefPrevention.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
+                continue;
+            }
+
+            //add this claim to the list of children of the current top level claim
+            childClaim.parent = topLevelClaim;
+            topLevelClaim.children.add(childClaim);
+            childClaim.inDataStore = true;
+        }
+
+        for (Claim claim : claimsToRemove) {
+            this.deleteClaimFromSecondaryStorage(claim);
+        }
         GriefPrevention.AddLogEntry(this.claims.size() + " total claims loaded.");
     }
 
@@ -62,7 +95,7 @@ public class ClaimRepository {
             }
         } else {
             //add it and mark it as added
-            if(!claims.contains(newClaim)) {
+            if (!claims.contains(newClaim)) {
                 this.claims.add(newClaim);
             }
             addToChunkClaimMap(newClaim);
@@ -187,6 +220,7 @@ public class ClaimRepository {
              PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_CLAIM)) {
             deleteStmnt.setInt(1, claim.id);
             deleteStmnt.executeUpdate();
+            claims.removeIf(c -> Objects.equals(claim.getID(), c.getID()));
         } catch (SQLException e) {
             GriefPrevention.AddLogEntry("Unable to delete data for claim " + claim.id + ".  Details:");
             GriefPrevention.AddLogEntry(e.getMessage());
