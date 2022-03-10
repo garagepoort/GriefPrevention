@@ -3,8 +3,8 @@ package me.ryanhamshire.GriefPrevention.claims;
 import be.garagepoort.mcioc.IocBean;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
-import me.ryanhamshire.GriefPrevention.UUIDFetcher;
 import me.ryanhamshire.GriefPrevention.database.DatabaseException;
+import org.apache.commons.lang.StringUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -116,20 +116,14 @@ public class ClaimRowMapper {
         List<String> resultNames = new ArrayList<>();
 
         for (String name : names) {
+            if(StringUtils.isEmpty(name)) {
+                continue;
+            }
             if (name.startsWith("[") || name.equals("public")) {
                 resultNames.add(name);
                 continue;
             }
-            UUID playerID = null;
-            try {
-                playerID = UUIDFetcher.getUUIDOf(name);
-            } catch (Exception ex) {
-            }
-
-            //if successful, replace player name with corresponding UUID
-            if (playerID != null) {
-                resultNames.add(playerID.toString());
-            }
+            resultNames.add(name);
         }
 
         return resultNames;
