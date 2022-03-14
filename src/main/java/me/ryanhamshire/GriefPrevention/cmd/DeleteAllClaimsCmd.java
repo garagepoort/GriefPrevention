@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -19,13 +19,13 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("deleteallclaims")
 public class DeleteAllClaimsCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
 
 
-    public DeleteAllClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
-        this.dataStore = dataStore;
+    public DeleteAllClaimsCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimService = claimService;
     }
@@ -51,7 +51,7 @@ public class DeleteAllClaimsCmd extends AbstractCmd {
             MessageService.sendMessage(player, TextMode.Success, Messages.DeleteAllSuccess, otherPlayer.getName());
             if (player != null) {
                 GriefPrevention.AddLogEntry(player.getName() + " deleted all claims belonging to " + otherPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity);
-                PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+                PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
                 bukkitUtils.runTaskLater(player, () -> Visualization.Revert(player, playerData));
             }
         });

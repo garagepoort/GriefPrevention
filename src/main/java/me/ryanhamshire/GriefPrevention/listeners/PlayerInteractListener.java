@@ -6,7 +6,7 @@ import me.ryanhamshire.GriefPrevention.AutoExtendClaimTask;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.ClaimPermission;
 import me.ryanhamshire.GriefPrevention.CreateClaimResult;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -59,13 +59,13 @@ public class PlayerInteractListener implements Listener {
     private final ConcurrentHashMap<Material, Boolean> inventoryHolderCache = new ConcurrentHashMap<>();
     private final ClaimBlockService claimBlockService;
     private final ClaimService claimService;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ResizeClaimService resizeClaimService;
 
-    public PlayerInteractListener(ClaimBlockService claimBlockService, ClaimService claimService, DataStore dataStore, ResizeClaimService resizeClaimService) {
+    public PlayerInteractListener(ClaimBlockService claimBlockService, ClaimService claimService, PlayerDataRepository playerDataRepository, ResizeClaimService resizeClaimService) {
         this.claimBlockService = claimBlockService;
         this.claimService = claimService;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.resizeClaimService = resizeClaimService;
     }
 
@@ -99,7 +99,7 @@ public class PlayerInteractListener implements Listener {
             clickedBlockType = Material.AIR;
         }
 
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
         //Turtle eggs
         if (action == Action.PHYSICAL && clickedBlockType == Material.TURTLE_EGG) {
@@ -324,7 +324,7 @@ public class PlayerInteractListener implements Listener {
 
                 return;
             } else if (clickedBlock != null && Tag.ITEMS_BOATS.isTagged(materialInHand)) {
-                if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                if (playerData == null) playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                 Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
                 if (claim != null) {
                     Supplier<String> reason = claimService.checkPermission(claim, player, ClaimPermission.Inventory, event);
@@ -345,7 +345,7 @@ public class PlayerInteractListener implements Listener {
                     materialInHand == Material.TNT_MINECART ||
                     materialInHand == Material.HOPPER_MINECART) &&
                 !ConfigLoader.creativeRulesApply(clickedBlock.getLocation())) {
-                if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                if (playerData == null) playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                 Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
                 if (claim != null) {
                     Supplier<String> reason = claimService.checkPermission(claim, player, ClaimPermission.Inventory, event);
@@ -384,7 +384,7 @@ public class PlayerInteractListener implements Listener {
                 }
 
                 //enforce limit on total number of entities in this claim
-                if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                if (playerData == null) playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                 Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
                 if (claim == null) return;
 
@@ -449,7 +449,7 @@ public class PlayerInteractListener implements Listener {
                     return;
                 }
 
-                if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                if (playerData == null) playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                 Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false /*ignore height*/, playerData.lastClaim);
 
                 //no claim case
@@ -502,7 +502,7 @@ public class PlayerInteractListener implements Listener {
 
                         //drop the data we just loaded, if the player isn't online
                         if (GriefPrevention.get().getServer().getPlayer(claim.ownerID) == null)
-                            this.dataStore.clearCachedPlayerData(claim.ownerID);
+                            this.playerDataRepository.clearCachedPlayerData(claim.ownerID);
                     }
                 }
 
@@ -516,7 +516,7 @@ public class PlayerInteractListener implements Listener {
             event.setCancelled(true);  //GriefPrevention exclusively reserves this tool  (e.g. no grass path creation for golden shovel)
 
             //disable golden shovel while under siege
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            if (playerData == null) playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             if (playerData.siegeData != null) {
                 MessageService.sendMessage(player, TextMode.Err, Messages.SiegeNoShovel);
                 event.setCancelled(true);
@@ -543,7 +543,7 @@ public class PlayerInteractListener implements Listener {
 
             //if the player is in restore nature mode, do only that
             UUID playerID = player.getUniqueId();
-            playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             if (playerData.shovelMode == ShovelMode.RestoreNature || playerData.shovelMode == ShovelMode.RestoreNatureAggressive) {
                 //if the clicked block is in a claim, visualize that claim and deliver an error message
                 Claim claim = this.claimService.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
@@ -950,7 +950,7 @@ public class PlayerInteractListener implements Listener {
                     //if it's a big claim, tell the player about subdivisions
                     if (!player.hasPermission("griefprevention.adminclaims") && result.claim.getArea() >= 1000) {
                         MessageService.sendMessage(player, TextMode.Info, Messages.BecomeMayor, 200L);
-                        MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, 201L, DataStore.SUBDIVISION_VIDEO_URL);
+                        MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, 201L, PlayerDataRepository.SUBDIVISION_VIDEO_URL);
                     }
 
                     autoExtendClaim(result.claim);

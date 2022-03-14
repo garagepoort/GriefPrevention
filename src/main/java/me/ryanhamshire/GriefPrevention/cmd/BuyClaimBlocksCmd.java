@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.EconomyHandler;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -19,15 +19,15 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("buyclaimblocks")
 public class BuyClaimBlocksCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final EconomyHandler economyHandler;
     
     private final ClaimBlockService claimBlockService;
     private final ClaimService claimService;
 
-    public BuyClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils, EconomyHandler economyHandler, ClaimBlockService claimBlockService, ClaimService claimService) {
-        this.dataStore = dataStore;
+    public BuyClaimBlocksCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, EconomyHandler economyHandler, ClaimBlockService claimBlockService, ClaimService claimService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.economyHandler = economyHandler;
         
@@ -65,7 +65,7 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
             if (args.length != 1) {
                 MessageService.sendMessage(player, TextMode.Info, Messages.BlockPurchaseCost, String.valueOf(ConfigLoader.config_economy_claimBlocksPurchaseCost), String.valueOf(economy.getBalance(player)));
             } else {
-                PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
                 //try to parse number of blocks
                 int blockCount;
@@ -102,7 +102,7 @@ public class BuyClaimBlocksCmd extends AbstractCmd {
 
                     //add blocks
                     playerData.setBonusClaimBlocks(playerData.getBonusClaimBlocks() + blockCount);
-                    this.dataStore.savePlayerData(player.getUniqueId(), playerData);
+                    this.playerDataRepository.savePlayerData(player.getUniqueId(), playerData);
 
                     //inform player
                     MessageService.sendMessage(player, TextMode.Success, Messages.PurchaseConfirmation, String.valueOf(totalCost), String.valueOf(claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()))));

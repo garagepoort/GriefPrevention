@@ -26,12 +26,12 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 public class DeliverClaimBlocksTask extends BukkitRunnable {
     private final Player player;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final int idleThresholdSquared;
 
-    public DeliverClaimBlocksTask(Player player, DataStore dataStore) {
+    public DeliverClaimBlocksTask(Player player, PlayerDataRepository playerDataRepository) {
         this.player = player;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.idleThresholdSquared = ConfigLoader.config_claims_accruedIdleThreshold * ConfigLoader.config_claims_accruedIdleThreshold;
 
         runTaskTimer(GriefPrevention.get(), 20L * 60 * 10, 20L * 60 * 10);
@@ -45,7 +45,7 @@ public class DeliverClaimBlocksTask extends BukkitRunnable {
             return; //player is not online to receive claim blocks
         }
 
-        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
 
         // check if player is idle. considered idle if
         //    in vehicle or is in water (pushed by water)

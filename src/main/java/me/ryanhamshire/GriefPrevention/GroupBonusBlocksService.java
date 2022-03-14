@@ -10,15 +10,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @IocBean
 public class GroupBonusBlocksService {
 
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
 
 
     //in-memory cache for group (permission-based) data
     protected ConcurrentHashMap<String, Integer> permissionToBonusBlocksMap;
 
-    public GroupBonusBlocksService(DataStore dataStore) {
-        this.dataStore = dataStore;
-        permissionToBonusBlocksMap = dataStore.getGroupBonusBlocks();
+    public GroupBonusBlocksService(PlayerDataRepository playerDataRepository) {
+        this.playerDataRepository = playerDataRepository;
+        permissionToBonusBlocksMap = playerDataRepository.getGroupBonusBlocks();
     }
 
     //gets the number of bonus blocks a player has from his permissions
@@ -48,7 +48,7 @@ public class GroupBonusBlocksService {
         this.permissionToBonusBlocksMap.put(groupName, currentValue);
 
         //write changes to storage to ensure they don't get lost
-        dataStore.saveGroupBonusBlocks(groupName, currentValue);
+        playerDataRepository.saveGroupBonusBlocks(groupName, currentValue);
 
         return currentValue;
     }

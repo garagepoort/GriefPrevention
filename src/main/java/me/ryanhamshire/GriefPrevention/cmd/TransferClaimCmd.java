@@ -4,7 +4,7 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -21,12 +21,12 @@ import java.util.UUID;
 @IocBean
 @IocCommandHandler("transferclaim")
 public class TransferClaimCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
 
-    public TransferClaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
-        this.dataStore = dataStore;
+    public TransferClaimCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimService = claimService;
     }

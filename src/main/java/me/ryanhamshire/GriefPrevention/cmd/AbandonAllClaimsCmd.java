@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -21,13 +21,13 @@ import java.util.List;
 @IocBean
 @IocCommandHandler("abandonallclaims")
 public class AbandonAllClaimsCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
 
-    public AbandonAllClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService) {
-        this.dataStore = dataStore;
+    public AbandonAllClaimsCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
@@ -46,7 +46,7 @@ public class AbandonAllClaimsCmd extends AbstractCmd {
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
             List<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
             int originalClaimCount = claims.size();

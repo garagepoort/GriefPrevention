@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -15,12 +15,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("claimbook")
 public class ClaimBookCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     
 
-    public ClaimBookCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public ClaimBookCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         
     }

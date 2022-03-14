@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -15,11 +15,11 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("subdivideclaims")
 public class SubdivideClaimsCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
 
-    public SubdivideClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public SubdivideClaimsCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
     }
 
@@ -28,11 +28,11 @@ public class SubdivideClaimsCmd extends AbstractCmd {
         validateIsPlayer(sender);
         Player player = (Player) sender;
         bukkitUtils.runTaskAsync(sender, () -> {
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Subdivide;
             playerData.claimSubdividing = null;
             MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionMode);
-            MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, DataStore.SUBDIVISION_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, PlayerDataRepository.SUBDIVISION_VIDEO_URL);
         });
 
         return true;

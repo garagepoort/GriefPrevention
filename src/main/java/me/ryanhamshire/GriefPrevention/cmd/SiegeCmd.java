@@ -4,14 +4,14 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.ClaimPermission;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.SiegeService;
 import me.ryanhamshire.GriefPrevention.TextMode;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
+import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
@@ -22,18 +22,18 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("siege")
 public class SiegeCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
     private final SiegeService siegeService;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
 
-    public SiegeCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, SiegeService siegeService, ClaimRepository claimRepository) {
-        this.dataStore = dataStore;
+    public SiegeCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService, SiegeService siegeService, DataStore dataStore) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimService = claimService;
         this.siegeService = siegeService;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
     }
 
     @Override
@@ -53,7 +53,7 @@ public class SiegeCmd extends AbstractCmd {
 
             //can't start a siege when you're already involved in one
             Player attacker = player;
-            PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+            PlayerData attackerData = this.playerDataRepository.getPlayerData(attacker.getUniqueId());
             if (attackerData.siegeData != null) {
                 MessageService.sendMessage(player, TextMode.Err, Messages.AlreadySieging);
                 return;
@@ -99,7 +99,7 @@ public class SiegeCmd extends AbstractCmd {
             }
 
             //victim must not be under siege already
-            PlayerData defenderData = this.dataStore.getPlayerData(defender.getUniqueId());
+            PlayerData defenderData = this.playerDataRepository.getPlayerData(defender.getUniqueId());
             if (defenderData.siegeData != null) {
                 MessageService.sendMessage(player, TextMode.Err, Messages.AlreadyUnderSiegePlayer);
                 return;

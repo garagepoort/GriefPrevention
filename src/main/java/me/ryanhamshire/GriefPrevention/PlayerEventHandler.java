@@ -21,7 +21,6 @@ package me.ryanhamshire.GriefPrevention;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.claims.ResizeClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
@@ -111,7 +110,7 @@ import java.util.regex.Pattern;
 @IocBean
 @IocListener
 public class PlayerEventHandler implements Listener {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final PvpProtectionService pvpProtectionService;
     private final BukkitUtils bukkitUtils;
 
@@ -124,21 +123,21 @@ public class PlayerEventHandler implements Listener {
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
     private final ResizeClaimService resizeClaimService;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
     private final SessionManager sessionManager;
     private final NotificationService notificationService;
     private final LogoutMessagesService logoutMessagesService;
 
-    public PlayerEventHandler(DataStore dataStore, PvpProtectionService pvpProtectionService, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, ClaimRepository claimRepository, SessionManager sessionManager, NotificationService notificationService, LogoutMessagesService logoutMessagesService) {
-        this.dataStore = dataStore;
-        bannedWordFinder = new WordFinder(dataStore.loadBannedWords());
+    public PlayerEventHandler(PlayerDataRepository playerDataRepository, PvpProtectionService pvpProtectionService, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, DataStore dataStore, SessionManager sessionManager, NotificationService notificationService, LogoutMessagesService logoutMessagesService) {
+        this.playerDataRepository = playerDataRepository;
+        bannedWordFinder = new WordFinder(playerDataRepository.loadBannedWords());
         this.pvpProtectionService = pvpProtectionService;
         this.bukkitUtils = bukkitUtils;
 
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
         this.resizeClaimService = resizeClaimService;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
         this.sessionManager = sessionManager;
         this.notificationService = notificationService;
         this.logoutMessagesService = logoutMessagesService;
@@ -164,11 +163,11 @@ public class PlayerEventHandler implements Listener {
         }
 
         //soft muted messages go out to all soft muted players
-        else if (this.dataStore.isSoftMuted(player.getUniqueId())) {
+        else if (this.playerDataRepository.isSoftMuted(player.getUniqueId())) {
             String notificationMessage = "(Muted " + player.getName() + "): " + message;
             Set<Player> recipientsToKeep = new HashSet<>();
             for (Player recipient : recipients) {
-                if (this.dataStore.isSoftMuted(recipient.getUniqueId())) {
+                if (this.playerDataRepository.isSoftMuted(recipient.getUniqueId())) {
                     recipientsToKeep.add(recipient);
                 } else if (recipient.hasPermission("griefprevention.eavesdrop")) {
                     recipient.sendMessage(ChatColor.GRAY + notificationMessage);
@@ -196,7 +195,7 @@ public class PlayerEventHandler implements Listener {
 
             //if player not new warn for the first infraction per play session.
             if (!isNewToServer(player)) {
-                PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+                PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
                 if (!playerData.profanityWarned) {
                     playerData.profanityWarned = true;
                     MessageService.sendMessage(player, TextMode.Err, Messages.NoProfanity);
@@ -209,7 +208,7 @@ public class PlayerEventHandler implements Listener {
             else if (ConfigLoader.config_trollFilterEnabled) {
                 GriefPrevention.AddLogEntry("Auto-muted new player " + player.getName() + " for profanity shortly after join.  Use /SoftMute to undo.", CustomLogEntryTypes.AdminActivity);
                 GriefPrevention.AddLogEntry(notificationMessage, CustomLogEntryTypes.MutedChat, false);
-                dataStore.toggleSoftMute(player.getUniqueId());
+                playerDataRepository.toggleSoftMute(player.getUniqueId());
             }
         }
 
@@ -221,13 +220,13 @@ public class PlayerEventHandler implements Listener {
             //based on ignore lists, remove some of the audience
             if (!player.hasPermission("griefprevention.notignorable")) {
                 Set<Player> recipientsToRemove = new HashSet<>();
-                PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                 for (Player recipient : recipients) {
                     if (!recipient.hasPermission("griefprevention.notignorable")) {
                         if (playerData.ignoredPlayers.containsKey(recipient.getUniqueId())) {
                             recipientsToRemove.add(recipient);
                         } else {
-                            PlayerData targetPlayerData = this.dataStore.getPlayerData(recipient.getUniqueId());
+                            PlayerData targetPlayerData = this.playerDataRepository.getPlayerData(recipient.getUniqueId());
                             if (targetPlayerData.ignoredPlayers.containsKey(player.getUniqueId())) {
                                 recipientsToRemove.add(recipient);
                             }
@@ -250,9 +249,9 @@ public class PlayerEventHandler implements Listener {
 
         if (this.howToClaimPattern.matcher(message).matches()) {
             if (ConfigLoader.creativeRulesApply(player.getLocation())) {
-                MessageService.sendMessage(player, TextMode.Info, Messages.CreativeBasicsVideo2, 10L, DataStore.CREATIVE_VIDEO_URL);
+                MessageService.sendMessage(player, TextMode.Info, Messages.CreativeBasicsVideo2, 10L, PlayerDataRepository.CREATIVE_VIDEO_URL);
             } else {
-                MessageService.sendMessage(player, TextMode.Info, Messages.SurvivalBasicsVideo2, 10L, DataStore.SURVIVAL_VIDEO_URL);
+                MessageService.sendMessage(player, TextMode.Info, Messages.SurvivalBasicsVideo2, 10L, PlayerDataRepository.SURVIVAL_VIDEO_URL);
             }
         }
 
@@ -294,7 +293,7 @@ public class PlayerEventHandler implements Listener {
         }
 
         //don't allow new players to chat after logging in until they move
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         if (playerData.noChatLocation != null) {
             Location currentLocation = player.getLocation();
             if (currentLocation.getBlockX() == playerData.noChatLocation.getBlockX() &&
@@ -368,7 +367,7 @@ public class PlayerEventHandler implements Listener {
             Player targetPlayer = GriefPrevention.get().getServer().getPlayer(args[1]);
 
             //softmute feature
-            if (this.dataStore.isSoftMuted(player.getUniqueId()) && targetPlayer != null && !this.dataStore.isSoftMuted(targetPlayer.getUniqueId())) {
+            if (this.playerDataRepository.isSoftMuted(player.getUniqueId()) && targetPlayer != null && !this.playerDataRepository.isSoftMuted(targetPlayer.getUniqueId())) {
                 event.setCancelled(true);
                 return;
             }
@@ -399,14 +398,14 @@ public class PlayerEventHandler implements Listener {
             //ignore feature
             if (targetPlayer != null && targetPlayer.isOnline()) {
                 //if either is ignoring the other, cancel this command
-                playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                 if (playerData.ignoredPlayers.containsKey(targetPlayer.getUniqueId()) && !targetPlayer.hasPermission("griefprevention.notignorable")) {
                     event.setCancelled(true);
                     MessageService.sendMessage(player, TextMode.Err, Messages.IsIgnoringYou);
                     return;
                 }
 
-                PlayerData targetPlayerData = this.dataStore.getPlayerData(targetPlayer.getUniqueId());
+                PlayerData targetPlayerData = this.playerDataRepository.getPlayerData(targetPlayer.getUniqueId());
                 if (targetPlayerData.ignoredPlayers.containsKey(player.getUniqueId()) && !player.hasPermission("griefprevention.notignorable")) {
                     event.setCancelled(true);
                     MessageService.sendMessage(player, TextMode.Err, Messages.IsIgnoringYou);
@@ -416,7 +415,7 @@ public class PlayerEventHandler implements Listener {
         }
 
         //if in pvp, block any pvp-banned slash commands
-        if (playerData == null) playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
+        if (playerData == null) playerData = this.playerDataRepository.getPlayerData(event.getPlayer().getUniqueId());
 
         if ((playerData.inPvpCombat() || playerData.siegeData != null) && ConfigLoader.config_pvp_blockedCommands.contains(command)) {
             event.setCancelled(true);
@@ -425,7 +424,7 @@ public class PlayerEventHandler implements Listener {
         }
 
         //soft mute for chat slash commands
-        if (category == CommandCategory.Chat && this.dataStore.isSoftMuted(player.getUniqueId())) {
+        if (category == CommandCategory.Chat && this.playerDataRepository.isSoftMuted(player.getUniqueId())) {
             event.setCancelled(true);
             return;
         }
@@ -577,7 +576,7 @@ public class PlayerEventHandler implements Listener {
         }
 
         //remember the player's ip address
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         playerData.ipAddress = event.getAddress();
     }
 
@@ -587,7 +586,7 @@ public class PlayerEventHandler implements Listener {
         Player player = event.getPlayer();
         boolean inventoryEmpty = GriefPrevention.isInventoryEmpty(player);
         bukkitUtils.runTaskAsync(player, () -> {
-            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
             playerData.lastSpawn = Calendar.getInstance().getTimeInMillis();
             playerData.lastPvpTimestamp = 0;  //no longer in pvp combat
 
@@ -618,7 +617,7 @@ public class PlayerEventHandler implements Listener {
         this.deathTimestamps.put(player.getUniqueId(), now);
 
         //these are related to locking dropped items on death to prevent theft
-        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
         playerData.dropsAreUnlocked = false;
         playerData.receivedDropUnlockAdvertisement = false;
     }
@@ -627,7 +626,7 @@ public class PlayerEventHandler implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     void onPlayerKicked(PlayerKickEvent event) {
         Player player = event.getPlayer();
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         playerData.wasKicked = true;
     }
 
@@ -635,7 +634,7 @@ public class PlayerEventHandler implements Listener {
     void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         UUID playerID = player.getUniqueId();
-        PlayerData playerData = this.dataStore.getPlayerData(playerID);
+        PlayerData playerData = this.playerDataRepository.getPlayerData(playerID);
         boolean isBanned;
 
         //If player is not trapped in a portal and has a pending rescue task, remove the associated metadata
@@ -668,7 +667,7 @@ public class PlayerEventHandler implements Listener {
 
         //make sure his data is all saved - he might have accrued some claim blocks while playing that were not saved immediately
         else {
-            this.dataStore.savePlayerData(player.getUniqueId(), playerData);
+            this.playerDataRepository.savePlayerData(player.getUniqueId(), playerData);
         }
 
         //FEATURE: players in pvp combat when they log out will die
@@ -685,7 +684,7 @@ public class PlayerEventHandler implements Listener {
         }
 
         //drop data about this player
-        this.dataStore.clearCachedPlayerData(playerID);
+        this.playerDataRepository.clearCachedPlayerData(playerID);
 
         //send quit message later, but only if the player stays offline
         if (ConfigLoader.config_spam_logoutMessageDelaySeconds > 0) {
@@ -710,7 +709,7 @@ public class PlayerEventHandler implements Listener {
             return;
         }
 
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
         //FEATURE: players under siege or in PvP combat, can't throw items on the ground to hide
         //them or give them away to other players before they are defeated
@@ -748,7 +747,7 @@ public class PlayerEventHandler implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
         //FEATURE: prevent players from using ender pearls to gain access to secured claims
         TeleportCause cause = event.getCause();
@@ -801,7 +800,7 @@ public class PlayerEventHandler implements Listener {
             return;
 
         Player player = event.getPlayer();
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
         Claim claim = this.claimService.getClaimAt(player.getLocation(), false, playerData.lastClaim);
         if (claim == null)
@@ -837,7 +836,7 @@ public class PlayerEventHandler implements Listener {
         if (!ConfigLoader.config_claims_protectDonkeys && entity instanceof Mule) return;
         if (!ConfigLoader.config_claims_protectLlamas && entity instanceof Llama) return;
 
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
         //if entity is tameable and has an owner, apply special rules
         if (entity instanceof Tameable) {
@@ -894,7 +893,7 @@ public class PlayerEventHandler implements Listener {
 
         //limit armor placements when entity count is too high
         if (entity.getType() == EntityType.ARMOR_STAND && ConfigLoader.creativeRulesApply(player.getLocation())) {
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            if (playerData == null) playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(entity.getLocation(), false, playerData.lastClaim);
             if (claim == null) return;
 
@@ -994,7 +993,7 @@ public class PlayerEventHandler implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerThrowEgg(PlayerEggThrowEvent event) {
         Player player = event.getPlayer();
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         Claim claim = this.claimService.getClaimAt(event.getEgg().getLocation(), false, playerData.lastClaim);
 
         //allow throw egg if player is in ignore claims mode
@@ -1028,8 +1027,8 @@ public class PlayerEventHandler implements Listener {
         //if should be protected from pulling in land claims without permission
         if (entity.getType() == EntityType.ARMOR_STAND || entity instanceof Animals) {
             Player player = event.getPlayer();
-            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
-            Claim claim = claimRepository.getClaimAt(entity.getLocation(), false, playerData.lastClaim);
+            PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
+            Claim claim = dataStore.getClaimAt(entity.getLocation(), false, playerData.lastClaim);
             if (claim != null) {
                 //if no permission, cancel
                 Supplier<String> errorMessage = claimService.checkPermission(claim, player, ClaimPermission.Inventory, event);
@@ -1059,7 +1058,7 @@ public class PlayerEventHandler implements Listener {
             OfflinePlayer owner = GriefPrevention.get().getServer().getOfflinePlayer(ownerID);
             String ownerName = GriefPrevention.lookupPlayerName(ownerID);
             if (owner.isOnline() && !player.equals(owner)) {
-                PlayerData playerData = this.dataStore.getPlayerData(ownerID);
+                PlayerData playerData = this.playerDataRepository.getPlayerData(ownerID);
 
                 //if locked, don't allow pickup
                 if (!playerData.dropsAreUnlocked) {
@@ -1083,7 +1082,7 @@ public class PlayerEventHandler implements Listener {
         //if we're preventing spawn camping and the player was previously empty handed...
         if (ConfigLoader.config_pvp_protectFreshSpawns && (GriefPrevention.get().getItemInHand(player, EquipmentSlot.HAND).getType() == Material.AIR)) {
             //if that player is currently immune to pvp
-            PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(event.getPlayer().getUniqueId());
             if (playerData.pvpImmune) {
                 //if it's been less than 10 seconds since the last time he spawned, don't pick up the item
                 long now = Calendar.getInstance().getTimeInMillis();
@@ -1111,7 +1110,7 @@ public class PlayerEventHandler implements Listener {
         if (newItemStack != null && newItemStack.getType() == ConfigLoader.config_claims_modificationTool) {
             //give the player his available claim blocks count and claiming instructions, but only if he keeps the shovel equipped for a minimum time, to avoid mouse wheel spam
             if (GriefPrevention.get().claimsEnabledForWorld(player.getWorld())) {
-                EquipShovelProcessingTask task = new EquipShovelProcessingTask(player, dataStore, claimService, claimBlockService);
+                EquipShovelProcessingTask task = new EquipShovelProcessingTask(player, playerDataRepository, claimService, claimBlockService);
                 GriefPrevention.get().getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 15L);  //15L is approx. 3/4 of a second
             }
         }
@@ -1146,7 +1145,7 @@ public class PlayerEventHandler implements Listener {
         }
 
         //if the bucket is being used in a claim, allow for dumping lava closer to other players
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         Claim claim = this.claimService.getClaimAt(block.getLocation(), false, playerData.lastClaim);
         if (claim != null) {
             minLavaDistance = 3;
@@ -1242,7 +1241,7 @@ public class PlayerEventHandler implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     void onTakeBook(PlayerTakeLecternBookEvent event) {
         Player player = event.getPlayer();
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         Claim claim = this.claimService.getClaimAt(event.getLectern().getLocation(), false, playerData.lastClaim);
         if (claim != null) {
             playerData.lastClaim = claim;
@@ -1264,7 +1263,7 @@ public class PlayerEventHandler implements Listener {
             player.getStatistic(Statistic.PICKUP, Material.ACACIA_LOG) > 0 ||
             player.getStatistic(Statistic.PICKUP, Material.DARK_OAK_LOG) > 0) return false;
 
-        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
         if (claimService.getClaims(player.getUniqueId(), player.getName()).size() > 0) return false;
 
         return true;

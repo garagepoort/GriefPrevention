@@ -4,7 +4,7 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -20,12 +20,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("deleteclaim")
 public class DeleteClaimCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
 
-    public DeleteClaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
-        this.dataStore = dataStore;
+    public DeleteClaimCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimService = claimService;
     }
@@ -44,7 +44,7 @@ public class DeleteClaimCmd extends AbstractCmd {
             } else {
                 //deleting an admin claim additionally requires the adminclaims permission
                 if (!claim.isAdminClaim() || player.hasPermission("griefprevention.adminclaims")) {
-                    PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                    PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                     if (claim.children.size() > 0 && !playerData.warnedAboutMajorDeletion) {
                         MessageService.sendMessage(player, TextMode.Warn, Messages.DeletionSubdivisionWarning);
                         playerData.warnedAboutMajorDeletion = true;

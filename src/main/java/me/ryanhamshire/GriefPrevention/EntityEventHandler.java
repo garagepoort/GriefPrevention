@@ -20,7 +20,6 @@ package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.events.PreventPvPEvent;
@@ -112,20 +111,20 @@ import java.util.function.Supplier;
 public class EntityEventHandler implements Listener
 {
     //convenience reference for the singleton datastore
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final NamespacedKey luredByPlayer;
     private final ClaimService claimService;
     private final SiegeService siegeService;
     private final BukkitUtils bukkitUtils;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
 
-    public EntityEventHandler(DataStore dataStore, ClaimService claimService, SiegeService siegeService, BukkitUtils bukkitUtils, ClaimRepository claimRepository)
+    public EntityEventHandler(PlayerDataRepository playerDataRepository, ClaimService claimService, SiegeService siegeService, BukkitUtils bukkitUtils, DataStore dataStore)
     {
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
         this.siegeService = siegeService;
         this.bukkitUtils = bukkitUtils;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
 
         luredByPlayer = new NamespacedKey(GriefPrevention.get(), "lured_by_player");
     }
@@ -654,7 +653,7 @@ public class EntityEventHandler implements Listener
         //otherwise, apply entity-count limitations for creative worlds
         else if (ConfigLoader.creativeRulesApply(event.getEntity().getLocation()))
         {
-            PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(event.getPlayer().getUniqueId());
             Claim claim = this.claimService.getClaimAt(event.getBlock().getLocation(), false, playerData.lastClaim);
             if (claim == null) return;
 
@@ -820,7 +819,7 @@ public class EntityEventHandler implements Listener
             if (damageSource.getType() == EntityType.AREA_EFFECT_CLOUD && event.getEntityType() == EntityType.PLAYER && GriefPrevention.get().pvpRulesApply(event.getEntity().getWorld()))
             {
                 Player damaged = (Player) event.getEntity();
-                PlayerData damagedData = dataStore.getPlayerData(damaged.getUniqueId());
+                PlayerData damagedData = playerDataRepository.getPlayerData(damaged.getUniqueId());
 
                 //case 1: recently spawned
                 if (ConfigLoader.config_pvp_protectFreshSpawns && damagedData.pvpImmune)
@@ -872,8 +871,8 @@ public class EntityEventHandler implements Listener
 
             if (attacker != defender)
             {
-                PlayerData defenderData = this.dataStore.getPlayerData(((Player) event.getEntity()).getUniqueId());
-                PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+                PlayerData defenderData = this.playerDataRepository.getPlayerData(((Player) event.getEntity()).getUniqueId());
+                PlayerData attackerData = this.playerDataRepository.getPlayerData(attacker.getUniqueId());
 
                 //otherwise if protecting spawning players
                 if (ConfigLoader.config_pvp_protectFreshSpawns)
@@ -956,7 +955,7 @@ public class EntityEventHandler implements Listener
                     if (pet.isTamed() && pet.getOwner() != null)
                     {
                         //if defender is NOT in pvp combat and not immune to pvp right now due to recent respawn
-                        PlayerData defenderData = dataStore.getPlayerData(event.getEntity().getUniqueId());
+                        PlayerData defenderData = playerDataRepository.getPlayerData(event.getEntity().getUniqueId());
                         if (!defenderData.pvpImmune && !defenderData.inPvpCombat())
                         {
                             //if defender is not in a protected area
@@ -1001,7 +1000,7 @@ public class EntityEventHandler implements Listener
                 PlayerData playerData = null;
                 if (attacker != null)
                 {
-                    playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+                    playerData = this.playerDataRepository.getPlayerData(attacker.getUniqueId());
                     cachedClaim = playerData.lastClaim;
                 }
 
@@ -1053,7 +1052,7 @@ public class EntityEventHandler implements Listener
                             if (attacker.getUniqueId().equals(ownerID)) return;
 
                             //allow for admin override
-                            PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+                            PlayerData attackerData = this.playerDataRepository.getPlayerData(attacker.getUniqueId());
                             if (attackerData.ignoreClaims) return;
 
                             //otherwise disallow in non-pvp worlds (and also pvp worlds if configured to do so)
@@ -1127,7 +1126,7 @@ public class EntityEventHandler implements Listener
 
                 if (attacker != null)
                 {
-                    playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+                    playerData = this.playerDataRepository.getPlayerData(attacker.getUniqueId());
                     cachedClaim = playerData.lastClaim;
                 }
 
@@ -1292,8 +1291,8 @@ public class EntityEventHandler implements Listener
         //if attacker not a player, do nothing
         if (attacker == null) return;
 
-        PlayerData defenderData = this.dataStore.getPlayerData(defender.getUniqueId());
-        PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+        PlayerData defenderData = this.playerDataRepository.getPlayerData(defender.getUniqueId());
+        PlayerData attackerData = this.playerDataRepository.getPlayerData(attacker.getUniqueId());
 
         if (attacker != defender)
         {
@@ -1366,7 +1365,7 @@ public class EntityEventHandler implements Listener
 
         if (attacker != null)
         {
-            playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+            playerData = this.playerDataRepository.getPlayerData(attacker.getUniqueId());
             cachedClaim = playerData.lastClaim;
         }
 
@@ -1495,8 +1494,8 @@ public class EntityEventHandler implements Listener
                 else if (ConfigLoader.config_pvp_noCombatInPlayerLandClaims || ConfigLoader.config_pvp_noCombatInAdminLandClaims)
                 {
                     Player effectedPlayer = (Player) effected;
-                    PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer.getUniqueId());
-                    PlayerData attackerData = this.dataStore.getPlayerData(thrower.getUniqueId());
+                    PlayerData defenderData = this.playerDataRepository.getPlayerData(effectedPlayer.getUniqueId());
+                    PlayerData attackerData = this.playerDataRepository.getPlayerData(thrower.getUniqueId());
                     Claim attackerClaim = this.claimService.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
                     if (attackerClaim != null && GriefPrevention.get().claimIsPvPSafeZone(attackerClaim))
                     {

@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -15,12 +15,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("restorenature")
 public class RestoreNatureCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     
 
-    public RestoreNatureCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public RestoreNatureCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         
     }
@@ -31,7 +31,7 @@ public class RestoreNatureCmd extends AbstractCmd {
         Player player = (Player) sender;
         bukkitUtils.runTaskAsync(sender, () -> {
             //change shovel mode
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNature;
             MessageService.sendMessage(player, TextMode.Instr, Messages.RestoreNatureActivate);
         });

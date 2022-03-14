@@ -1,312 +1,365 @@
-/*
-    GriefPrevention Server Plugin for Minecraft
-    Copyright (C) 2012 Ryan Hamshire
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package me.ryanhamshire.GriefPrevention;
 
-import com.google.common.io.Files;
-import org.bukkit.ChatColor;
-import org.bukkit.entity.Player;
+import be.garagepoort.mcioc.IocBean;
+import me.ryanhamshire.GriefPrevention.claims.ClaimRowMapper;
+import me.ryanhamshire.GriefPrevention.database.DatabaseException;
+import me.ryanhamshire.GriefPrevention.database.SqlConnectionProvider;
+import me.ryanhamshire.GriefPrevention.util.HelperUtil;
+import org.bukkit.Location;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.nio.charset.Charset;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
-//singleton class which manages all GriefPrevention data (except for config options)
-public abstract class DataStore {
+@IocBean
+public class DataStore {
 
-    //in-memory cache for player data
-    protected ConcurrentHashMap<UUID, PlayerData> playerNameToPlayerDataMap = new ConcurrentHashMap<>();
+    private static final String SQL_INSERT_CLAIM = "INSERT INTO griefprevention_claimdata (owner, lessercorner, greatercorner, builders, containers, accessors, managers, inheritnothing, parentid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private static final String SQL_DELETE_CLAIM = "DELETE FROM griefprevention_claimdata WHERE id = ?";
 
-    //path information, for where stuff stored on disk is well...  stored
-    protected final static String dataLayerFolderPath = "plugins" + File.separator + "GriefPreventionData";
-    final static String playerDataFolderPath = dataLayerFolderPath + File.separator + "PlayerData";
-    public final static String configFilePath = dataLayerFolderPath + File.separator + "config.yml";
-    final static String softMuteFilePath = dataLayerFolderPath + File.separator + "softMute.txt";
-    final static String bannedWordsFilePath = dataLayerFolderPath + File.separator + "bannedWords.txt";
+    private final List<Claim> claims;
+    private final ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<>();
 
-    //the latest version of the data schema implemented here
-    protected static final int latestSchemaVersion = 3;
+    private final SqlConnectionProvider sqlConnectionProvider;
+    private final ClaimRowMapper claimRowMapper;
 
-    //reading and writing the schema version to the data store
-    abstract int getSchemaVersionFromStorage();
+    public DataStore(SqlConnectionProvider sqlConnectionProvider, ClaimRowMapper claimRowMapper) {
+        this.sqlConnectionProvider = sqlConnectionProvider;
+        this.claimRowMapper = claimRowMapper;
+        this.claims = getAllClaims();
+        //load claims data into memory
 
-    abstract void updateSchemaVersionInStorage(int versionToSet);
+        ArrayList<Claim> claimsToRemove = new ArrayList<>();
+        ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
 
-    //current version of the schema of data in secondary storage
-    private int currentSchemaVersion = -1;  //-1 means not determined yet
+        for (Claim claim : claims) {
+            if (claim.parentId == -1) {
+                this.addClaim(claim, false);
+            } else {
+                subdivisionsToLoad.add(claim);
+            }
+        }
 
-    //video links
-    public static final String SURVIVAL_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpuser" + ChatColor.RESET;
-    public static final String CREATIVE_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpcrea" + ChatColor.RESET;
-    public static final String SUBDIVISION_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpsub" + ChatColor.RESET;
+        //add subdivisions to their parent claims
+        for (Claim childClaim : subdivisionsToLoad) {
+            //find top level claim parent
+            Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), true, null);
 
-    //list of UUIDs which are soft-muted
-    ConcurrentHashMap<UUID, Boolean> softMuteMap = new ConcurrentHashMap<>();
+            if (topLevelClaim == null) {
+                claimsToRemove.add(childClaim);
+                GriefPrevention.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
+                continue;
+            }
 
-    protected int getSchemaVersion() {
-        if (this.currentSchemaVersion >= 0) {
-            return this.currentSchemaVersion;
+            //add this claim to the list of children of the current top level claim
+            childClaim.parent = topLevelClaim;
+            topLevelClaim.children.add(childClaim);
+            childClaim.inDataStore = true;
+        }
+
+        for (Claim claim : claimsToRemove) {
+            this.deleteClaimFromSecondaryStorage(claim);
+        }
+        GriefPrevention.AddLogEntry(this.claims.size() + " total claims loaded.");
+    }
+
+    //adds a claim to the datastore, making it an effective claim
+    public void addClaim(Claim newClaim, boolean writeToStorage) {
+        //subdivisions are added under their parent, not directly to the hash map for direct search
+        addClaimToCache(newClaim);
+
+        if (writeToStorage) {
+            this.writeClaimToStorage(newClaim);
+        }
+    }
+
+    public ConcurrentHashMap<Long, ArrayList<Claim>> getChunksToClaimsMap() {
+        return chunksToClaimsMap;
+    }
+
+    private void addClaimToCache(Claim newClaim) {
+        if (newClaim.parent != null) {
+            if (!newClaim.parent.children.contains(newClaim)) {
+                newClaim.parent.children.add(newClaim);
+            }
         } else {
-            this.currentSchemaVersion = this.getSchemaVersionFromStorage();
-            return this.currentSchemaVersion;
+            //add it and mark it as added
+            if (!claims.contains(newClaim)) {
+                this.claims.add(newClaim);
+            }
+            addToChunkClaimMap(newClaim);
         }
     }
 
-    protected void setSchemaVersion(int versionToSet) {
-        this.currentSchemaVersion = versionToSet;
-        this.updateSchemaVersionInStorage(versionToSet);
-    }
-
-    //initialization!
-    void initialize() throws Exception {
-        //ensure data folders exist
-        File playerDataFolder = new File(playerDataFolderPath);
-        if (!playerDataFolder.exists()) {
-            playerDataFolder.mkdirs();
-        }
-
-        //load list of soft mutes
-        this.loadSoftMutes();
-    }
-
-    private void loadSoftMutes() {
-        File softMuteFile = new File(softMuteFilePath);
-        if (softMuteFile.exists()) {
-            BufferedReader inStream = null;
-            try {
-                //open the file
-                inStream = new BufferedReader(new FileReader(softMuteFile.getAbsolutePath()));
-
-                //while there are lines left
-                String nextID = inStream.readLine();
-                while (nextID != null) {
-                    //parse line into a UUID
-                    UUID playerID;
-                    try {
-                        playerID = UUID.fromString(nextID);
-                    } catch (Exception e) {
-                        playerID = null;
-                        GriefPrevention.AddLogEntry("Failed to parse soft mute entry as a UUID: " + nextID);
+    public void removeFromChunkClaimMap(Claim claim) {
+        ArrayList<Long> chunkHashes = claim.getChunkHashes();
+        for (Long chunkHash : chunkHashes) {
+            ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkHash);
+            if (claimsInChunk != null) {
+                for (Iterator<Claim> it = claimsInChunk.iterator(); it.hasNext(); ) {
+                    Claim c = it.next();
+                    if (c.id.equals(claim.id)) {
+                        it.remove();
+                        break;
                     }
-
-                    //push it into the map
-                    if (playerID != null) {
-                        this.softMuteMap.put(playerID, true);
-                    }
-
-                    //move to the next
-                    nextID = inStream.readLine();
                 }
-            } catch (Exception e) {
-                GriefPrevention.AddLogEntry("Failed to read from the soft mute data file: " + e.toString());
-                e.printStackTrace();
-            }
-
-            try {
-                if (inStream != null) inStream.close();
-            } catch (IOException exception) {
-            }
-        }
-    }
-
-    public List<String> loadBannedWords() {
-        try {
-            File bannedWordsFile = new File(bannedWordsFilePath);
-            if (!bannedWordsFile.exists()) {
-                Files.touch(bannedWordsFile);
-                String defaultWords =
-                    "nigger\nniggers\nniger\nnigga\nnigers\nniggas\n" +
-                        "fag\nfags\nfaggot\nfaggots\nfeggit\nfeggits\nfaggit\nfaggits\n" +
-                        "cunt\ncunts\nwhore\nwhores\nslut\nsluts\n";
-                Files.append(defaultWords, bannedWordsFile, Charset.forName("UTF-8"));
-            }
-
-            return Files.readLines(bannedWordsFile, Charset.forName("UTF-8"));
-        } catch (Exception e) {
-            GriefPrevention.AddLogEntry("Failed to read from the banned words data file: " + e.toString());
-            e.printStackTrace();
-            return new ArrayList<>();
-        }
-    }
-
-    //updates soft mute map and data file
-    public boolean toggleSoftMute(UUID playerID) {
-        boolean newValue = !this.isSoftMuted(playerID);
-
-        this.softMuteMap.put(playerID, newValue);
-        this.saveSoftMutes();
-
-        return newValue;
-    }
-
-    public boolean isSoftMuted(UUID playerID) {
-        Boolean mapEntry = this.softMuteMap.get(playerID);
-        if (mapEntry == null || mapEntry == Boolean.FALSE) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private void saveSoftMutes() {
-        BufferedWriter outStream = null;
-
-        try {
-            //open the file and write the new value
-            File softMuteFile = new File(softMuteFilePath);
-            softMuteFile.createNewFile();
-            outStream = new BufferedWriter(new FileWriter(softMuteFile));
-
-            for (Map.Entry<UUID, Boolean> entry : softMuteMap.entrySet()) {
-                if (entry.getValue().booleanValue()) {
-                    outStream.write(entry.getKey().toString());
-                    outStream.newLine();
+                if (claimsInChunk.isEmpty()) { // if nothing's left, remove this chunk's cache
+                    this.chunksToClaimsMap.remove(chunkHash);
                 }
             }
         }
+    }
 
-        //if any problem, log it
-        catch (Exception e) {
-            GriefPrevention.AddLogEntry("Unexpected exception saving soft mute data: " + e.getMessage());
-            e.printStackTrace();
+    public void addToChunkClaimMap(Claim claim) {
+        if (claim.parent != null) return;
+
+        ArrayList<Long> chunkHashes = claim.getChunkHashes();
+        for (Long chunkHash : chunkHashes) {
+            ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.computeIfAbsent(chunkHash, k -> new ArrayList<>());
+            claimsInChunk.add(claim);
         }
+    }
 
-        //close the file
+    public void saveClaim(Claim claim) {
+        this.writeClaimToStorage(claim);
+        addClaimToCache(claim);
+    }
+
+    synchronized void writeClaimToStorage(Claim claim)  //see datastore.cs.  this will ALWAYS be a top level claim
+    {
         try {
-            if (outStream != null) outStream.close();
-        } catch (IOException exception) {
+            //wipe out any existing data about this
+            if (claim.id != null) {
+                this.deleteClaimFromSecondaryStorage(claim);
+            }
+
+            //write claim data to the database
+            this.writeClaimData(claim);
+            claim.inDataStore = true;
+        } catch (SQLException e) {
+            GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
+            GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
         }
     }
 
-    //removes cached player data from memory
-    public synchronized void clearCachedPlayerData(UUID playerID) {
-        this.playerNameToPlayerDataMap.remove(playerID);
-    }
+    //actually writes claim data to the database
+    private void writeClaimData(Claim claim) throws SQLException {
+        String lesserCornerString = this.locationToString(claim.getLesserBoundaryCorner());
+        String greaterCornerString = this.locationToString(claim.getGreaterBoundaryCorner());
+        String owner = "";
+        if (claim.ownerID != null) owner = claim.ownerID.toString();
 
-    abstract void saveGroupBonusBlocks(String groupName, int amount);
+        ArrayList<String> builders = new ArrayList<>();
+        ArrayList<String> containers = new ArrayList<>();
+        ArrayList<String> accessors = new ArrayList<>();
+        ArrayList<String> managers = new ArrayList<>();
 
-    public PlayerData getPlayerData(UUID playerID) {
-        if (this.playerNameToPlayerDataMap.containsKey(playerID)) {
-            return playerNameToPlayerDataMap.get(playerID);
+        claim.getPermissions(builders, containers, accessors, managers);
+
+        String buildersString = this.storageStringBuilder(builders);
+        String containersString = this.storageStringBuilder(containers);
+        String accessorsString = this.storageStringBuilder(accessors);
+        String managersString = this.storageStringBuilder(managers);
+        boolean inheritNothing = claim.getSubclaimRestrictions();
+        long parentId = claim.parent == null ? -1 : claim.parent.id;
+
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             PreparedStatement insertStmt = connection.prepareStatement(SQL_INSERT_CLAIM, Statement.RETURN_GENERATED_KEYS)) {
+
+            insertStmt.setString(1, owner);
+            insertStmt.setString(2, lesserCornerString);
+            insertStmt.setString(3, greaterCornerString);
+            insertStmt.setString(4, buildersString);
+            insertStmt.setString(5, containersString);
+            insertStmt.setString(6, accessorsString);
+            insertStmt.setString(7, managersString);
+            insertStmt.setBoolean(8, inheritNothing);
+            insertStmt.setLong(9, parentId);
+            insertStmt.executeUpdate();
+
+            ResultSet generatedKeys = insertStmt.getGeneratedKeys();
+            int generatedKey = -1;
+            if (generatedKeys.next()) {
+                generatedKey = generatedKeys.getInt(1);
+            }
+            claim.id = generatedKey;
+        } catch (SQLException e) {
+            GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
+            GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
         }
-        PlayerData playerData = getPlayerDataFromStorage(playerID).orElseGet(() -> new PlayerData(playerID));
-        this.playerNameToPlayerDataMap.put(playerID, playerData);
-        return playerData;
     }
 
-    abstract Optional<PlayerData> getPlayerDataFromStorage(UUID playerID);
+    private String locationToString(Location location) {
+        StringBuilder stringBuilder = new StringBuilder(location.getWorld().getName());
+        String locationStringDelimiter = ";";
+        stringBuilder.append(locationStringDelimiter);
+        stringBuilder.append(location.getBlockX());
+        stringBuilder.append(locationStringDelimiter);
+        stringBuilder.append(location.getBlockY());
+        stringBuilder.append(locationStringDelimiter);
+        stringBuilder.append(location.getBlockZ());
 
-    //saves changes to player data to secondary storage.  MUST be called after you're done making changes, otherwise a reload will lose them
-    public void savePlayerDataSync(UUID playerID, PlayerData playerData) {
-        this.asyncSavePlayerData(playerID, playerData);
+        return stringBuilder.toString();
     }
 
-    //saves changes to player data to secondary storage.  MUST be called after you're done making changes, otherwise a reload will lose them
-    public void savePlayerData(UUID playerID, PlayerData playerData) {
-        new SavePlayerDataThread(playerID, playerData).start();
+    public synchronized void deleteClaimFromSecondaryStorage(Claim claim) {
+        try (Connection connection = sqlConnectionProvider.getConnection();
+             PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_CLAIM)) {
+            deleteStmnt.setInt(1, claim.id);
+            deleteStmnt.executeUpdate();
+            claims.removeIf(c -> Objects.equals(claim.getID(), c.getID()));
+        } catch (SQLException e) {
+            GriefPrevention.AddLogEntry("Unable to delete data for claim " + claim.id + ".  Details:");
+            GriefPrevention.AddLogEntry(e.getMessage());
+            throw new DatabaseException(e.getCause());
+        }
     }
 
-    public void asyncSavePlayerData(UUID playerID, PlayerData playerData) {
-        //save everything except the ignore list
-        this.overrideSavePlayerData(playerID, playerData);
+    private String storageStringBuilder(ArrayList<String> input) {
+        StringBuilder output = new StringBuilder();
+        for (String string : input) {
+            output.append(string).append(";");
+        }
+        return output.toString();
+    }
 
-        //save the ignore list
-        if (playerData.ignoreListChanged) {
-            StringBuilder fileContent = new StringBuilder();
-            try {
-                for (UUID uuidKey : playerData.ignoredPlayers.keySet()) {
-                    Boolean value = playerData.ignoredPlayers.get(uuidKey);
-                    if (value == null) continue;
+    //gets the claim at a specific location
+    //ignoreHeight = TRUE means that a location UNDER an existing claim will return the claim
+    //cachedClaim can be NULL, but will help performance if you have a reasonable guess about which claim the location is in
+    public Claim getClaimAt(Location location, boolean ignoreHeight, Claim cachedClaim) {
+        return getClaimAt(location, ignoreHeight, false, cachedClaim);
+    }
 
-                    //admin-enforced ignores begin with an asterisk
-                    if (value) {
-                        fileContent.append("*");
-                    }
+    public Claim getClaimAt(Location location, boolean ignoreHeight, boolean ignoreSubclaims, Claim cachedClaim) {
+//        //check cachedClaim guess first.  if it's in the datastore and the location is inside it, we're done
+//        if (cachedClaim != null && cachedClaim.inDataStore && cachedClaim.contains(location, ignoreHeight, !ignoreSubclaims))
+//            return cachedClaim;
 
-                    fileContent.append(uuidKey);
-                    fileContent.append("\n");
+        //find a top level claim
+        Long chunkID = HelperUtil.getChunkHash(location);
+        ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkID);
+        if (claimsInChunk == null) return null;
+
+        for (Claim claim : claimsInChunk) {
+            if (claim.inDataStore && claim.contains(location, ignoreHeight, false)) {
+                // If ignoring subclaims, claim is a match.
+                if (ignoreSubclaims) return claim;
+
+                //when we find a top level claim, if the location is in one of its subdivisions,
+                //return the SUBDIVISION, not the top level claim
+                for (int j = 0; j < claim.children.size(); j++) {
+                    Claim subdivision = claim.children.get(j);
+                    if (subdivision.inDataStore && subdivision.contains(location, ignoreHeight, false))
+                        return subdivision;
                 }
 
-                //write data to file
-                File playerDataFile = new File(playerDataFolderPath + File.separator + playerID + ".ignore");
-                Files.write(fileContent.toString().trim().getBytes("UTF-8"), playerDataFile);
-            }
-
-            //if any problem, log it
-            catch (Exception e) {
-                GriefPrevention.AddLogEntry("GriefPrevention: Unexpected exception saving data for player \"" + playerID.toString() + "\": " + e.getMessage());
-                e.printStackTrace();
+                return claim;
             }
         }
+
+        //if no claim found, return null
+        return null;
     }
 
-    abstract void overrideSavePlayerData(UUID playerID, PlayerData playerData);
+    public List<Claim> getAllClaimsForPlayer(UUID playerId) {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement selectParentClaims = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid = ?");
+             PreparedStatement selectSubdivisions = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid != ?")) {
+            selectParentClaims.setString(1, playerId.toString());
+            selectParentClaims.setInt(2, -1);
+            selectSubdivisions.setString(1, playerId.toString());
+            selectSubdivisions.setInt(2, -1);
 
-    //extend a siege, if it's possible to do so
-    synchronized void tryExtendSiege(Player player, Claim claim) {
-        PlayerData playerData = this.getPlayerData(player.getUniqueId());
-
-        //player must be sieged
-        if (playerData.siegeData == null) return;
-
-        //claim isn't already under the same siege
-        if (playerData.siegeData.claims.contains(claim)) return;
-
-        //admin claims can't be sieged
-        if (claim.isAdminClaim()) return;
-
-        //player must have some level of permission to be sieged in a claim
-        Claim currentClaim = claim;
-        while (!currentClaim.hasExplicitPermission(player, ClaimPermission.Access)) {
-            if (currentClaim.parent == null) return;
-            currentClaim = currentClaim.parent;
-        }
-
-        //otherwise extend the siege
-        playerData.siegeData.claims.add(claim);
-        claim.siegeData = playerData.siegeData;
-    }
-
-    private class SavePlayerDataThread extends Thread {
-        private final UUID playerID;
-        private final PlayerData playerData;
-
-        SavePlayerDataThread(UUID playerID, PlayerData playerData) {
-            this.playerID = playerID;
-            this.playerData = playerData;
-        }
-
-        public void run() {
-            //ensure player data is already read from file before trying to save
-            playerData.getAccruedClaimBlocks();
-            asyncSavePlayerData(this.playerID, this.playerData);
+            return loadClaims(selectParentClaims, selectSubdivisions);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
         }
     }
 
-    public abstract ConcurrentHashMap<String, Integer> getGroupBonusBlocks();
+    public List<Claim> getAllAdminClaims() {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement selectParentClaims = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid = ?");
+             PreparedStatement selectSubdivisions = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE owner = ? and parentid != ?")) {
+            selectParentClaims.setNull(1, Types.VARCHAR);
+            selectParentClaims.setInt(2, -1);
+            selectSubdivisions.setNull(1, Types.VARCHAR);
+            selectSubdivisions.setInt(2, -1);
+
+            return loadClaims(selectParentClaims, selectSubdivisions);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    public List<Claim> getAllClaims() {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement selectParentClaims = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE parentid = ?");
+             PreparedStatement selectSubdivisions = sql.prepareStatement("SELECT * FROM griefprevention_claimdata WHERE parentid != ?")) {
+            selectParentClaims.setInt(1, -1);
+            selectSubdivisions.setInt(1, -1);
+
+            return loadClaims(selectParentClaims, selectSubdivisions);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    private List<Claim> loadClaims(PreparedStatement selectParentClaims, PreparedStatement selectSubdivisions) throws SQLException {
+        List<Claim> parentClaims = new ArrayList<>();
+        try (ResultSet rs = selectParentClaims.executeQuery()) {
+            while (rs.next()) {
+                claimRowMapper.map(rs).ifPresent(parentClaims::add);
+            }
+        }
+
+        List<Claim> subDivisions = new ArrayList<>();
+        try (ResultSet rs = selectSubdivisions.executeQuery()) {
+            while (rs.next()) {
+                claimRowMapper.map(rs).ifPresent(subDivisions::add);
+            }
+        }
+
+        for (Claim parentClaim : parentClaims) {
+            parentClaim.setChildren(subDivisions.stream().filter(s -> s.parentId == parentClaim.id).collect(Collectors.toList()));
+        }
+        return parentClaims;
+    }
+
+    public void deleteAllClaimsForPlayer(UUID playerID) {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement insert = sql.prepareStatement("DELETE FROM griefprevention_claimdata WHERE owner = ?");) {
+            insert.setString(1, playerID.toString());
+            insert.executeUpdate();
+            claims.removeIf(c -> Objects.equals(playerID, c.ownerID));
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    public void deleteAdminClaims() {
+        try (Connection sql = sqlConnectionProvider.getConnection();
+             PreparedStatement insert = sql.prepareStatement("DELETE FROM griefprevention_claimdata WHERE owner = ?");) {
+            insert.setNull(1, Types.VARCHAR);
+            insert.executeUpdate();
+            claims.removeIf(c -> c.ownerID == null);
+        } catch (SQLException e) {
+            throw new DatabaseException(e);
+        }
+    }
+
+    public List<Claim> getClaims() {
+        return claims;
+    }
 }

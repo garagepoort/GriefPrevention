@@ -1,7 +1,6 @@
 package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.IocBean;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.events.TrustChangedEvent;
 import org.bukkit.Bukkit;
@@ -16,11 +15,11 @@ import java.util.function.Supplier;
 public class TrustService {
 
     private final ClaimService claimService;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
 
-    public TrustService(ClaimService claimService, ClaimRepository claimRepository) {
+    public TrustService(ClaimService claimService, DataStore dataStore) {
         this.claimService = claimService;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
     }
 
     public void handleTrust(Player player, ClaimPermission permissionLevel, String recipientName) {
@@ -124,7 +123,7 @@ public class TrustService {
             } else {
                 currentClaim.setPermission(identifierToAdd, permissionLevel);
             }
-            this.claimRepository.saveClaim(currentClaim);
+            this.dataStore.saveClaim(currentClaim);
         }
 
         //notify player

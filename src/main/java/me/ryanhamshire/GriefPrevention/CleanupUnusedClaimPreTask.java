@@ -32,13 +32,13 @@ import java.util.UUID;
 
 class CleanupUnusedClaimPreTask implements Runnable {
     private UUID ownerID;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ClaimBlockService claimBlockService;
     private final ClaimService claimService;
 
-    CleanupUnusedClaimPreTask(UUID uuid, DataStore dataStore, ClaimBlockService claimBlockService, ClaimService claimService) {
+    CleanupUnusedClaimPreTask(UUID uuid, PlayerDataRepository playerDataRepository, ClaimBlockService claimBlockService, ClaimService claimService) {
         this.ownerID = uuid;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.claimBlockService = claimBlockService;
         this.claimService = claimService;
     }
@@ -46,7 +46,7 @@ class CleanupUnusedClaimPreTask implements Runnable {
     @Override
     public void run() {
         //get the data
-        Optional<PlayerData> ownerData = dataStore.getPlayerDataFromStorage(ownerID);
+        Optional<PlayerData> ownerData = playerDataRepository.getPlayerDataFromStorage(ownerID);
         if (ownerData.isPresent()) {
 
             OfflinePlayer ownerInfo = Bukkit.getServer().getOfflinePlayer(ownerID);

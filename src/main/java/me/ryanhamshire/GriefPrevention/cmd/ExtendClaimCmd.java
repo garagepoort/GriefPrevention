@@ -4,7 +4,7 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.ClaimPermission;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -23,12 +23,12 @@ import java.util.function.Supplier;
 @IocBean
 @IocCommandHandler("extendclaim")
 public class ExtendClaimCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ClaimService claimService;
     private final ResizeClaimService resizeClaimService;
 
-    public ExtendClaimCmd(DataStore dataStore, ClaimService claimService, ResizeClaimService resizeClaimService) {
-        this.dataStore = dataStore;
+    public ExtendClaimCmd(PlayerDataRepository playerDataRepository, ClaimService claimService, ResizeClaimService resizeClaimService) {
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
         this.resizeClaimService = resizeClaimService;
     }
@@ -56,7 +56,7 @@ public class ExtendClaimCmd extends AbstractCmd {
         }
 
         //must be standing in a land claim
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         Claim claim = this.claimService.getClaimAt(player.getLocation(), true, playerData.lastClaim);
         if (claim == null) {
             MessageService.sendMessage(player, TextMode.Err, Messages.StandInClaimToResize);
@@ -134,9 +134,9 @@ public class ExtendClaimCmd extends AbstractCmd {
 
     private boolean sendVideoLink(Player player) {
         if (ConfigLoader.creativeRulesApply(player.getLocation())) {
-            MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, PlayerDataRepository.CREATIVE_VIDEO_URL);
         } else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
-            MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, PlayerDataRepository.SURVIVAL_VIDEO_URL);
         }
         return false;
     }

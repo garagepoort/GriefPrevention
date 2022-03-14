@@ -31,19 +31,19 @@ public class PlayerRescueTask implements Runnable
 
     //rescue destination, may be decided at instantiation or at execution
     private Location destination;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final PlayerRescueService playerRescueService;
 
     //player data
     private final Player player;
     
 
-    public PlayerRescueTask(Player player, Location location, Location destination, DataStore dataStore, PlayerRescueService playerRescueService)
+    public PlayerRescueTask(Player player, Location location, Location destination, PlayerDataRepository playerDataRepository, PlayerRescueService playerRescueService)
     {
         this.player = player;
         this.location = location;
         this.destination = destination;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.playerRescueService = playerRescueService;
         
     }
@@ -55,7 +55,7 @@ public class PlayerRescueTask implements Runnable
         if (!player.isOnline()) return;
 
         //he no longer has a pending /trapped slash command, so he can try to use it again now
-        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
         playerData.pendingTrapped = false;
 
         //if the player moved three or more blocks from where he used /trapped, admonish him and don't save him

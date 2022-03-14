@@ -29,14 +29,14 @@ class SiegeCheckupTask implements Runnable
 {
     private final SiegeData siegeData;
     private final ClaimService claimService;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final SiegeService siegeService;
 
-    public SiegeCheckupTask(SiegeData siegeData, ClaimService claimService, DataStore dataStore, SiegeService siegeService)
+    public SiegeCheckupTask(SiegeData siegeData, ClaimService claimService, PlayerDataRepository playerDataRepository, SiegeService siegeService)
     {
         this.siegeData = siegeData;
         this.claimService = claimService;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.siegeService = siegeService;
     }
 

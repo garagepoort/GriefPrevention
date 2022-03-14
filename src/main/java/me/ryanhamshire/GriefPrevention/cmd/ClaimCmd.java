@@ -5,7 +5,7 @@ import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.AutoExtendClaimTask;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.CreateClaimResult;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -35,14 +35,14 @@ import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 @IocBean
 @IocCommandHandler("claim")
 public class ClaimCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
     private final ResizeClaimService resizeClaimService;
 
-    public ClaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService) {
-        this.dataStore = dataStore;
+    public ClaimCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
@@ -60,7 +60,7 @@ public class ClaimCmd extends AbstractCmd {
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
             //if he's at the claim count per player limit already and doesn't have permission to bypass, display an error message
             List<Claim> claims = claimService.getClaims(player.getUniqueId(), player.getName());
@@ -144,9 +144,9 @@ public class ClaimCmd extends AbstractCmd {
 
                 //link to a video demo of land claiming, based on world type
                 if (ConfigLoader.creativeRulesApply(player.getLocation())) {
-                    sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                    sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, PlayerDataRepository.CREATIVE_VIDEO_URL);
                 } else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
-                    sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                    sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, PlayerDataRepository.SURVIVAL_VIDEO_URL);
                 }
 
                 Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation());

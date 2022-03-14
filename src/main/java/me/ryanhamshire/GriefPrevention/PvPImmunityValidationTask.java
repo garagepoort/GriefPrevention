@@ -25,12 +25,12 @@ import org.bukkit.entity.Player;
 class PvPImmunityValidationTask implements Runnable
 {
     private final Player player;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
 
-    public PvPImmunityValidationTask(Player player, DataStore dataStore)
+    public PvPImmunityValidationTask(Player player, PlayerDataRepository playerDataRepository)
     {
         this.player = player;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
     }
 
     @Override
@@ -38,7 +38,7 @@ class PvPImmunityValidationTask implements Runnable
     {
         if (!player.isOnline()) return;
 
-        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
         if (!playerData.pvpImmune) return;
 
         //check the player's inventory for anything

@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.GroupBonusBlocksService;
 import me.ryanhamshire.GriefPrevention.MessageService;
@@ -22,15 +22,15 @@ import java.util.List;
 @IocBean
 @IocCommandHandler("claimslist")
 public class ClaimsListCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
     private final GroupBonusBlocksService groupBonusBlocksService;
 
-    public ClaimsListCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, GroupBonusBlocksService groupBonusBlocksService) {
-        this.dataStore = dataStore;
+    public ClaimsListCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, GroupBonusBlocksService groupBonusBlocksService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         
         this.claimService = claimService;
@@ -65,7 +65,7 @@ public class ClaimsListCmd extends AbstractCmd {
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
-            PlayerData playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(otherPlayer.getUniqueId());
             List<Claim> claims = claimService.getClaims(otherPlayer.getUniqueId(), otherPlayer.getName());
             MessageService.sendMessage(player, TextMode.Instr, Messages.StartBlockMath,
                 String.valueOf(claimBlockService.recalculateAccruedClaimBlocks(playerData)),
@@ -82,7 +82,7 @@ public class ClaimsListCmd extends AbstractCmd {
 
             //drop the data we just loaded, if the player isn't online
             if (!otherPlayer.isOnline())
-                this.dataStore.clearCachedPlayerData(otherPlayer.getUniqueId());
+                this.playerDataRepository.clearCachedPlayerData(otherPlayer.getUniqueId());
         });
 
         return true;

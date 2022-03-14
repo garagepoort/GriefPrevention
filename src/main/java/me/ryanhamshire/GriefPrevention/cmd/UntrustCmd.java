@@ -8,7 +8,7 @@ import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.TextMode;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
+import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.events.TrustChangedEvent;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
@@ -20,11 +20,11 @@ import org.bukkit.entity.Player;
 @IocCommandHandler("untrust")
 public class UntrustCmd extends AbstractCmd {
     private final ClaimService claimService;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
 
-    public UntrustCmd(ClaimService claimService, ClaimRepository claimRepository) {
+    public UntrustCmd(ClaimService claimService, DataStore dataStore) {
         this.claimService = claimService;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
     }
 
     @Override
@@ -97,7 +97,7 @@ public class UntrustCmd extends AbstractCmd {
                 }
 
                 //save changes
-                this.claimRepository.saveClaim(claim);
+                this.dataStore.saveClaim(claim);
             }
 
             //beautify for output
@@ -168,7 +168,7 @@ public class UntrustCmd extends AbstractCmd {
                 }
             }
 
-            this.claimRepository.saveClaim(claim);
+            this.dataStore.saveClaim(claim);
         }
 
         return true;

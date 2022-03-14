@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.siege;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.SiegeService;
@@ -18,12 +18,12 @@ import org.bukkit.event.entity.EntityDeathEvent;
 @IocBean
 @IocListener
 public class OnDeathSiegeListener implements Listener {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final SiegeService siegeService;
     private final BukkitUtils bukkitUtils;
 
-    public OnDeathSiegeListener(DataStore dataStore, SiegeService siegeService, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public OnDeathSiegeListener(PlayerDataRepository playerDataRepository, SiegeService siegeService, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.siegeService = siegeService;
         this.bukkitUtils = bukkitUtils;
     }
@@ -36,7 +36,7 @@ public class OnDeathSiegeListener implements Listener {
 
         Player player = (Player) entity;
         bukkitUtils.runTaskAsync(() -> {
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             if (playerData.siegeData != null) {
                 this.siegeService.endSiege(playerData.siegeData, null, player.getName(), event.getDrops());
             }

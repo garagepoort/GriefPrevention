@@ -3,7 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.griefprevention</groupId>
+    <groupId>com.github.TechFortress</groupId>
     <artifactId>GriefPrevention</artifactId>
     <version>16.18-RC2-SNAPSHOT</version>
 
@@ -199,7 +199,7 @@
         <dependency>
             <groupId>be.garagepoort.mcioc</groupId>
             <artifactId>tubing</artifactId>
-            <version>4.1.2</version>
+            <version>5.0.1</version>
             <exclusions>
                 <exclusion>
                     <groupId>*</groupId>

@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.GroupBonusBlocksService;
 import me.ryanhamshire.GriefPrevention.MessageService;
@@ -19,12 +19,12 @@ import java.util.UUID;
 @IocBean
 @IocCommandHandler("adjustbonusclaimblocks")
 public class AdjustBonusClaimsCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final GroupBonusBlocksService groupBonusBlocksService;
 
-    public AdjustBonusClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, GroupBonusBlocksService groupBonusBlocksService) {
-        this.dataStore = dataStore;
+    public AdjustBonusClaimsCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, GroupBonusBlocksService groupBonusBlocksService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.groupBonusBlocksService = groupBonusBlocksService;
     }
@@ -70,9 +70,9 @@ public class AdjustBonusClaimsCmd extends AbstractCmd {
             }
 
             //give blocks to player
-            PlayerData playerData = this.dataStore.getPlayerData(targetPlayer.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(targetPlayer.getUniqueId());
             playerData.setBonusClaimBlocks(playerData.getBonusClaimBlocks() + adjustment);
-            this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
+            this.playerDataRepository.savePlayerData(targetPlayer.getUniqueId(), playerData);
 
             MessageService.sendMessage(sender, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
             if (sender != null)

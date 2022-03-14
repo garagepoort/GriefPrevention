@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -17,12 +17,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("setaccruedclaimblocks")
 public class SetAccruedClaimBlocksCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     
 
-    public SetAccruedClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public SetAccruedClaimBlocksCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         
     }
@@ -50,9 +50,9 @@ public class SetAccruedClaimBlocksCmd extends AbstractCmd {
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
-            PlayerData playerData = this.dataStore.getPlayerData(targetPlayer.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(targetPlayer.getUniqueId());
             playerData.setAccruedClaimBlocks(newAmount);
-            this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
+            this.playerDataRepository.savePlayerData(targetPlayer.getUniqueId(), playerData);
 
             MessageService.sendMessage(player, TextMode.Success, Messages.SetClaimBlocksSuccess);
             if (player != null)

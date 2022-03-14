@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -15,12 +15,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("unlockdrops")
 public class UnlockDropsCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     
 
-    public UnlockDropsCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public UnlockDropsCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         
     }
@@ -39,10 +39,10 @@ public class UnlockDropsCmd extends AbstractCmd {
                     return;
                 }
 
-                playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
+                playerData = this.playerDataRepository.getPlayerData(otherPlayer.getUniqueId());
                 MessageService.sendMessage(player, TextMode.Success, Messages.DropUnlockOthersConfirmation, otherPlayer.getName());
             } else {
-                playerData = this.dataStore.getPlayerData(player.getUniqueId());
+                playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
                 MessageService.sendMessage(player, TextMode.Success, Messages.DropUnlockConfirmation);
             }
 

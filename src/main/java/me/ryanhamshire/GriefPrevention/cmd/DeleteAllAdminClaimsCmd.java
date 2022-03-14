@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -18,12 +18,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("deletealladminclaims")
 public class DeleteAllAdminClaimsCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimService claimService;
 
-    public DeleteAllAdminClaimsCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimService claimService) {
-        this.dataStore = dataStore;
+    public DeleteAllAdminClaimsCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, ClaimService claimService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimService = claimService;
     }
@@ -38,7 +38,7 @@ public class DeleteAllAdminClaimsCmd extends AbstractCmd {
         }
 
         bukkitUtils.runTaskAsync(sender, () -> {
-            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
             //delete all admin claims
             claimService.deleteAdminClaims( true);  //null for owner id indicates an administrative claim
 

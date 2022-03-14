@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.EconomyHandler;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -18,15 +18,15 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("sellclaimblocks")
 public class SellClaimBlocksCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final EconomyHandler economyHandler;
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
 
 
-    public SellClaimBlocksCmd(DataStore dataStore, BukkitUtils bukkitUtils, EconomyHandler economyHandler, ClaimService claimService, ClaimBlockService claimBlockService) {
-        this.dataStore = dataStore;
+    public SellClaimBlocksCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, EconomyHandler economyHandler, ClaimService claimService, ClaimBlockService claimBlockService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.economyHandler = economyHandler;
         this.claimService = claimService;
@@ -58,7 +58,7 @@ public class SellClaimBlocksCmd extends AbstractCmd {
             }
 
             //load player data
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             int availableBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()));
 
             //if no amount provided, just tell player value per block sold, and how many he can sell
@@ -92,7 +92,7 @@ public class SellClaimBlocksCmd extends AbstractCmd {
 
                 //subtract blocks
                 playerData.setBonusClaimBlocks(playerData.getBonusClaimBlocks() - blockCount);
-                this.dataStore.savePlayerData(player.getUniqueId(), playerData);
+                this.playerDataRepository.savePlayerData(player.getUniqueId(), playerData);
 
                 //inform player
                 int remainingClaimBlocks = claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()));

@@ -38,13 +38,13 @@ class EntityCleanupTask implements Runnable
 {
     //where to start cleaning in the list of entities
     private final double percentageStart;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ClaimService claimService;
 
-    public EntityCleanupTask(double percentageStart, DataStore dataStore, ClaimService claimService)
+    public EntityCleanupTask(double percentageStart, PlayerDataRepository playerDataRepository, ClaimService claimService)
     {
         this.percentageStart = percentageStart;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
     }
 
@@ -147,7 +147,7 @@ class EntityCleanupTask implements Runnable
             nextRunPercentageStart = 0;
         }
 
-        EntityCleanupTask task = new EntityCleanupTask(nextRunPercentageStart, dataStore, claimService);
+        EntityCleanupTask task = new EntityCleanupTask(nextRunPercentageStart, playerDataRepository, claimService);
         GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task, 20L * 60 * 1);
     }
 }

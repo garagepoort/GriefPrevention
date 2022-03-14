@@ -10,11 +10,11 @@ import static me.ryanhamshire.GriefPrevention.config.ConfigLoader.pvpRulesApply;
 
 @IocBean
 public class PvpProtectionService {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     
 
-    public PvpProtectionService(DataStore dataStore) {
-        this.dataStore = dataStore;
+    public PvpProtectionService(PlayerDataRepository playerDataRepository) {
+        this.playerDataRepository = playerDataRepository;
         
     }
 
@@ -35,14 +35,14 @@ public class PvpProtectionService {
         //check inventory for well, anything
         if (hasEmptyInventory) {
             //if empty, apply immunity
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             playerData.pvpImmune = true;
 
             //inform the player after he finishes respawning
             sendMessage(player, TextMode.Success, Messages.PvPImmunityStart, 5L);
 
             //start a task to re-check this player's inventory every minute until his immunity is gone
-            PvPImmunityValidationTask task = new PvPImmunityValidationTask(player, dataStore);
+            PvPImmunityValidationTask task = new PvPImmunityValidationTask(player, playerDataRepository);
             GriefPrevention.get().getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 1200L);
         }
     }

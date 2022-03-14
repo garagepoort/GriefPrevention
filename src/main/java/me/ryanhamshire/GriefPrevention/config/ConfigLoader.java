@@ -1,7 +1,7 @@
 package me.ryanhamshire.GriefPrevention.config;
 
 import me.ryanhamshire.GriefPrevention.ClaimsMode;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.PistonMode;
 import org.bukkit.GameMode;
@@ -25,7 +25,7 @@ import static me.ryanhamshire.GriefPrevention.GriefPrevention.AddLogEntry;
 import static org.bukkit.Bukkit.getServer;
 
 public class ConfigLoader {
-    public DataStore dataStore;
+    public PlayerDataRepository playerDataRepository;
 
     //configuration variables, loaded/saved from a config.yml
 
@@ -180,7 +180,7 @@ public class ConfigLoader {
 
     public static void load() {
         //load the config if it exists
-        FileConfiguration config = YamlConfiguration.loadConfiguration(new File(DataStore.configFilePath));
+        FileConfiguration config = YamlConfiguration.loadConfiguration(new File(PlayerDataRepository.configFilePath));
         FileConfiguration outConfig = new YamlConfiguration();
         outConfig.options().header("Default values are perfect for most servers.  If you want to customize and have a question, look for the answer here first: http://dev.bukkit.org/bukkit-plugins/grief-prevention/pages/setup-and-configuration/");
 
@@ -650,9 +650,9 @@ public class ConfigLoader {
         outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Muted Chat Messages", config_logs_mutedChatEnabled);
 
         try {
-            outConfig.save(DataStore.configFilePath);
+            outConfig.save(PlayerDataRepository.configFilePath);
         } catch (IOException exception) {
-            AddLogEntry("Unable to write to the configuration file at \"" + DataStore.configFilePath + "\"");
+            AddLogEntry("Unable to write to the configuration file at \"" + PlayerDataRepository.configFilePath + "\"");
         }
 
         //try to parse the list of commands requiring access trust in land claims

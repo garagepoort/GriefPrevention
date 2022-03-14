@@ -46,17 +46,17 @@ public class RestoreNatureExecutionTask implements Runnable
 
     //player who should be notified about the result (will see a visualization when the restoration is complete)
     private final Player player;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ClaimService claimService;
 
-    public RestoreNatureExecutionTask(BlockSnapshot[][][] snapshots, int miny, Location lesserCorner, Location greaterCorner, Player player, DataStore dataStore, ClaimService claimService)
+    public RestoreNatureExecutionTask(BlockSnapshot[][][] snapshots, int miny, Location lesserCorner, Location greaterCorner, Player player, PlayerDataRepository playerDataRepository, ClaimService claimService)
     {
         this.snapshots = snapshots;
         this.miny = miny;
         this.lesserCorner = lesserCorner;
         this.greaterCorner = greaterCorner;
         this.player = player;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
     }
 
@@ -128,7 +128,7 @@ public class RestoreNatureExecutionTask implements Runnable
         {
             Claim claim = new Claim(lesserCorner, greaterCorner, null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), null);
             Visualization visualization = Visualization.FromClaim(claim, player.getLocation().getBlockY(), VisualizationType.RestoreNature, player.getLocation());
-            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
             Visualization.Apply(player, playerData, visualization);
         }
     }

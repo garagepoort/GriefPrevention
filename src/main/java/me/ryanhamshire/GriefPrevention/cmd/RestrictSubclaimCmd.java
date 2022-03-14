@@ -3,12 +3,12 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
+import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -16,14 +16,14 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("restrictsubclaim")
 public class RestrictSubclaimCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
 
-    public RestrictSubclaimCmd(DataStore dataStore, BukkitUtils bukkitUtils, ClaimRepository claimRepository) {
-        this.dataStore = dataStore;
+    public RestrictSubclaimCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, DataStore dataStore) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
     }
 
     @Override
@@ -32,8 +32,8 @@ public class RestrictSubclaimCmd extends AbstractCmd {
         Player player = (Player) sender;
         bukkitUtils.runTaskAsync(sender, () -> {
 
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-            Claim claim = this.claimRepository.getClaimAt(player.getLocation(), true, playerData.lastClaim);
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
+            Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
             if (claim == null || claim.parent == null) {
                 MessageService.sendMessage(player, TextMode.Err, Messages.StandInSubclaim);
                 return;
@@ -54,7 +54,7 @@ public class RestrictSubclaimCmd extends AbstractCmd {
                 claim.setSubclaimRestrictions(true);
                 MessageService.sendMessage(player, TextMode.Success, Messages.SubclaimRestricted);
             }
-            this.claimRepository.saveClaim(claim);
+            this.dataStore.saveClaim(claim);
         });
 
         return true;

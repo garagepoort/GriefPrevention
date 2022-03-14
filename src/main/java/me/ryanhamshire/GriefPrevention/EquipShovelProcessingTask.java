@@ -31,15 +31,15 @@ class EquipShovelProcessingTask implements Runnable
 {
     //player data
     private final Player player;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
 
-    public EquipShovelProcessingTask(Player player, DataStore dataStore, ClaimService claimService, ClaimBlockService claimBlockService)
+    public EquipShovelProcessingTask(Player player, PlayerDataRepository playerDataRepository, ClaimService claimService, ClaimBlockService claimBlockService)
     {
         this.player = player;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
@@ -52,7 +52,7 @@ class EquipShovelProcessingTask implements Runnable
         if (GriefPrevention.instance.getItemInHand(player, EquipmentSlot.HAND).getType() != ConfigLoader.config_claims_modificationTool)
             return;
 
-        PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = playerDataRepository.getPlayerData(player.getUniqueId());
 
         //reset any work he might have been doing
         playerData.lastShovelLocation = null;
@@ -72,11 +72,11 @@ class EquipShovelProcessingTask implements Runnable
         //link to a video demo of land claiming, based on world type
         if (ConfigLoader.creativeRulesApply(player.getLocation()))
         {
-            MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, PlayerDataRepository.CREATIVE_VIDEO_URL);
         }
         else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
         {
-            MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+            MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, PlayerDataRepository.SURVIVAL_VIDEO_URL);
         }
 
         //if standing in a claim owned by the player, visualize it

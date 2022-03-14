@@ -16,22 +16,22 @@ import java.util.Map;
 @IocBean
 public class SiegeService {
 
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ClaimService claimService;
 
     //timestamp for each siege cooldown to end
     private final HashMap<String, Long> siegeCooldownRemaining = new HashMap<>();
 
-    public SiegeService(DataStore dataStore, ClaimService claimService) {
-        this.dataStore = dataStore;
+    public SiegeService(PlayerDataRepository playerDataRepository, ClaimService claimService) {
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
     }
 
     public void startSiege(Player attacker, Player defender, Claim defenderClaim) {
         //fill-in the necessary SiegeData instance
         SiegeData siegeData = new SiegeData(attacker, defender, defenderClaim);
-        PlayerData attackerData = dataStore.getPlayerData(attacker.getUniqueId());
-        PlayerData defenderData = dataStore.getPlayerData(defender.getUniqueId());
+        PlayerData attackerData = playerDataRepository.getPlayerData(attacker.getUniqueId());
+        PlayerData defenderData = playerDataRepository.getPlayerData(defender.getUniqueId());
         attackerData.siegeData = siegeData;
         defenderData.siegeData = siegeData;
         defenderClaim.siegeData = siegeData;
@@ -39,7 +39,7 @@ public class SiegeService {
         //start a task to monitor the siege
         //why isn't this a "repeating" task?
         //because depending on the status of the siege at the time the task runs, there may or may not be a reason to run the task again
-        SiegeCheckupTask task = new SiegeCheckupTask(siegeData, claimService, dataStore, this);
+        SiegeCheckupTask task = new SiegeCheckupTask(siegeData, claimService, playerDataRepository, this);
         siegeData.checkupTaskID = GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task, 20L * 30);
     }
 
@@ -54,7 +54,7 @@ public class SiegeService {
             this.siegeCooldownRemaining.remove(attacker.getName() + "_" + defender.getName());
         }
 
-        PlayerData defenderData = dataStore.getPlayerData(defender.getUniqueId());
+        PlayerData defenderData = playerDataRepository.getPlayerData(defender.getUniqueId());
         if (defenderData.lastSiegeEndTimeStamp > 0) {
             long now = System.currentTimeMillis();
             if (now - defenderData.lastSiegeEndTimeStamp > 1000 * 60 * 15) //15 minutes in milliseconds
@@ -97,10 +97,10 @@ public class SiegeService {
             grantAccess = true;
         }
 
-        PlayerData attackerData = dataStore.getPlayerData(siegeData.attacker.getUniqueId());
+        PlayerData attackerData = playerDataRepository.getPlayerData(siegeData.attacker.getUniqueId());
         attackerData.siegeData = null;
 
-        PlayerData defenderData = dataStore.getPlayerData(siegeData.defender.getUniqueId());
+        PlayerData defenderData = playerDataRepository.getPlayerData(siegeData.defender.getUniqueId());
         defenderData.siegeData = null;
         defenderData.lastSiegeEndTimeStamp = System.currentTimeMillis();
 

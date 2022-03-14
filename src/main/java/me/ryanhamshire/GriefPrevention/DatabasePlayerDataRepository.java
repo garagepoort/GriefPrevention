@@ -38,7 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 //manages data stored in the file system
-public class DatabaseDataStore extends DataStore {
+public class DatabasePlayerDataRepository extends PlayerDataRepository {
 
     private static final String SQL_UPDATE_NAME =
         "UPDATE griefprevention_playerdata SET name = ? WHERE name = ?";
@@ -59,7 +59,7 @@ public class DatabaseDataStore extends DataStore {
 
     private final SqlConnectionProvider sqlConnectionProvider;
 
-    public DatabaseDataStore(SqlConnectionProvider sqlConnectionProvider) throws Exception {
+    public DatabasePlayerDataRepository(SqlConnectionProvider sqlConnectionProvider) throws Exception {
         super();
         this.sqlConnectionProvider = sqlConnectionProvider;
 

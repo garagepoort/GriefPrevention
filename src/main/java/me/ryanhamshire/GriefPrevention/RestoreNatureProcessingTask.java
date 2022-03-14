@@ -74,18 +74,18 @@ public class RestoreNatureProcessingTask implements Runnable
     private final boolean creativeMode;
     private final int seaLevel;
     private final boolean aggressiveMode;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
 
     //two lists of materials
     private final Set<Material> notAllowedToHang;    //natural blocks which don't naturally hang in their air
     private final Set<Material> playerBlocks;        //a "complete" list of player-placed blocks.  MUST BE MAINTAINED as patches introduce more
     private final ClaimService claimService;
 
-    public RestoreNatureProcessingTask(BlockSnapshot[][][] snapshots, int miny, Environment environment, Biome biome, Location lesserBoundaryCorner, Location greaterBoundaryCorner, int seaLevel, boolean aggressiveMode, boolean creativeMode, Player player, DataStore dataStore, ClaimService claimService)
+    public RestoreNatureProcessingTask(BlockSnapshot[][][] snapshots, int miny, Environment environment, Biome biome, Location lesserBoundaryCorner, Location greaterBoundaryCorner, int seaLevel, boolean aggressiveMode, boolean creativeMode, Player player, PlayerDataRepository playerDataRepository, ClaimService claimService)
     {
         this.snapshots = snapshots;
         this.miny = miny;
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
         if (this.miny < 0) this.miny = 0;
         this.environment = environment;
@@ -190,7 +190,7 @@ public class RestoreNatureProcessingTask implements Runnable
         ///this.removePlayerLeaves();
 
         //schedule main thread task to apply the result to the world
-        RestoreNatureExecutionTask task = new RestoreNatureExecutionTask(this.snapshots, this.miny, this.lesserBoundaryCorner, this.greaterBoundaryCorner, this.player, dataStore, claimService);
+        RestoreNatureExecutionTask task = new RestoreNatureExecutionTask(this.snapshots, this.miny, this.lesserBoundaryCorner, this.greaterBoundaryCorner, this.player, playerDataRepository, claimService);
         GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task);
     }
 

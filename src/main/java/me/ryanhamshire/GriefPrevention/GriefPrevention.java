@@ -19,6 +19,8 @@
 package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.TubingPlugin;
+import be.garagepoort.mcioc.configuration.files.ConfigurationFile;
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.BanList;
 import org.bukkit.BanList.Type;
@@ -35,6 +37,8 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -47,6 +51,8 @@ public class GriefPrevention extends TubingPlugin {
 
     //for logging to the console and log file
     private static Logger log;
+    //this handles data storage, like player and region data
+    public DataStore dataStore;
 
     // Event handlers with common functionality
     EntityEventHandler entityEventHandler;
@@ -80,8 +86,9 @@ public class GriefPrevention extends TubingPlugin {
     }
 
     //initializes well...   everything
+
     @Override
-    public void enable() {
+    protected void beforeEnable() {
         instance = this;
         log = instance.getLogger();
 
@@ -96,12 +103,20 @@ public class GriefPrevention extends TubingPlugin {
         CacheOfflinePlayerNamesThread namesThread = new CacheOfflinePlayerNamesThread(offlinePlayers, this.playerNameToIDMap);
         namesThread.setPriority(Thread.MIN_PRIORITY);
         namesThread.start();
+    }
 
+    @Override
+    public void enable() {
         AddLogEntry("Boot finished.");
+        this.dataStore = getIocContainer().get(DataStore.class);
+    }
+
+    @Override
+    public List<ConfigurationFile> getConfigurationFiles() {
+        return Collections.emptyList();
     }
 
     public enum IgnoreMode {None, StandardIgnore, AdminIgnore}
-
 
     public static String getfriendlyLocationString(Location location) {
         return location.getWorld().getName() + ": x" + location.getBlockX() + ", z" + location.getBlockZ();
@@ -192,11 +207,11 @@ public class GriefPrevention extends TubingPlugin {
         //save data for any online players
         @SuppressWarnings("unchecked")
         Collection<Player> players = (Collection<Player>) this.getServer().getOnlinePlayers();
-        DataStore dataStore = getIocContainer().get(DataStore.class);
+        PlayerDataRepository playerDataRepository = getIocContainer().get(PlayerDataRepository.class);
         for (Player player : players) {
             UUID playerID = player.getUniqueId();
-            PlayerData playerData = dataStore.getPlayerData(playerID);
-            dataStore.savePlayerDataSync(playerID, playerData);
+            PlayerData playerData = playerDataRepository.getPlayerData(playerID);
+            playerDataRepository.savePlayerDataSync(playerID, playerData);
         }
 
         //dump any remaining unwritten log entries
@@ -289,7 +304,6 @@ public class GriefPrevention extends TubingPlugin {
             !claim.isAdminClaim() && ConfigLoader.config_pvp_noCombatInPlayerLandClaims;
     }
 
-
     //Track scheduled "rescues" so we can cancel them if the player happens to teleport elsewhere so we can cancel it.
     ConcurrentHashMap<UUID, BukkitTask> portalReturnTaskMap = new ConcurrentHashMap<>();
 
@@ -302,5 +316,14 @@ public class GriefPrevention extends TubingPlugin {
             portalReturnTaskMap.put(player.getUniqueId(), task).cancel();
         else
             portalReturnTaskMap.put(player.getUniqueId(), task);
+    }
+
+    public String allowBuild(Player player, Location location) {
+        // TODO check all derivatives and rework API
+        return this.allowBuild(player, location, location.getBlock().getType());
+    }
+
+    public String allowBuild(Player player, Location location, Material material) {
+        return getIocContainer().get(ClaimService.class).allowBuild(player, location, material);
     }
 }

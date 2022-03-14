@@ -3,11 +3,11 @@ package me.ryanhamshire.GriefPrevention.listeners;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.PendingItemProtection;
 import me.ryanhamshire.GriefPrevention.PlayerData;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
+import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.events.ProtectDeathDropsEvent;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
@@ -28,12 +28,12 @@ import java.util.UUID;
 @IocBean
 @IocListener
 public class OnDeath implements Listener {
-    private final DataStore dataStore;
-    private final ClaimRepository claimService;
+    private final PlayerDataRepository playerDataRepository;
+    private final DataStore claimService;
     private final BukkitUtils bukkitUtils;
 
-    public OnDeath(DataStore dataStore, ClaimRepository claimService, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public OnDeath(PlayerDataRepository playerDataRepository, DataStore claimService, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
         this.bukkitUtils = bukkitUtils;
     }
@@ -54,7 +54,7 @@ public class OnDeath implements Listener {
         World world = entity.getWorld();
 
         bukkitUtils.runTaskAsync(() -> {
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             boolean isPvPWorld = GriefPrevention.get().pvpRulesApply(world);
             if ((isPvPWorld && ConfigLoader.config_lockDeathDropsInPvpWorlds) ||
                 (!isPvPWorld && ConfigLoader.config_lockDeathDropsInNonPvpWorlds)) {

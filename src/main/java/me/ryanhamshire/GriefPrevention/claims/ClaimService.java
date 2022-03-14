@@ -7,6 +7,7 @@ import me.ryanhamshire.GriefPrevention.ClaimPermission;
 import me.ryanhamshire.GriefPrevention.ClaimsMode;
 import me.ryanhamshire.GriefPrevention.CreateClaimResult;
 import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -55,24 +56,24 @@ import static me.ryanhamshire.GriefPrevention.config.ConfigLoader.creativeRulesA
 @IocBean
 public class ClaimService {
 
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final ClaimBlockService claimBlockService;
     private final ClaimFactory claimFactory;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
     //world guard reference, if available
     private WorldGuardWrapper worldGuard = null;
 
-    public ClaimService(DataStore dataStore,
+    public ClaimService(PlayerDataRepository playerDataRepository,
                         BukkitUtils bukkitUtils,
                         ClaimBlockService claimBlockService,
                         ClaimFactory claimFactory,
-                        ClaimRepository claimRepository) {
-        this.dataStore = dataStore;
+                        DataStore dataStore) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.claimBlockService = claimBlockService;
         this.claimFactory = claimFactory;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
 
         try {
             this.worldGuard = new WorldGuardWrapper();
@@ -92,7 +93,7 @@ public class ClaimService {
     }
 
     public boolean abandonClaim(Player player, boolean deleteTopLevelClaim) {
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
 
         //which claim is being abandoned?
         Claim claim = getClaimAt(player.getLocation(), true /*ignore height*/, null);
@@ -141,7 +142,7 @@ public class ClaimService {
     public String allowBuild(Player player, Location location, Material material) {
         if (!GriefPrevention.instance.claimsEnabledForWorld(location.getWorld())) return null;
 
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         Claim claim = getClaimAt(location, false, playerData.lastClaim);
 
         //exception: administrators in ignore claims mode
@@ -156,7 +157,7 @@ public class ClaimService {
                     String reason = MessageService.getMessage(Messages.NoBuildOutsideClaims);
                     if (player.hasPermission("griefprevention.ignoreclaims"))
                         reason += "  " + MessageService.getMessage(Messages.IgnoreClaimsAdvertisement);
-                    reason += "  " + MessageService.getMessage(Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                    reason += "  " + MessageService.getMessage(Messages.CreativeBasicsVideo2, PlayerDataRepository.CREATIVE_VIDEO_URL);
                     return reason;
                 } else {
                     return null;
@@ -224,7 +225,7 @@ public class ClaimService {
         }
 
         // Claim owner and admins in ignoreclaims mode have access.
-        if (uuid.equals(claim.getOwnerID()) || dataStore.getPlayerData(uuid).ignoreClaims)
+        if (uuid.equals(claim.getOwnerID()) || playerDataRepository.getPlayerData(uuid).ignoreClaims)
             return null;
 
         // Look for explicit individual permission.
@@ -240,7 +241,7 @@ public class ClaimService {
         // Special building-only rules.
         if (permission == ClaimPermission.Build) {
             // No building while in PVP.
-            PlayerData playerData = dataStore.getPlayerData(uuid);
+            PlayerData playerData = playerDataRepository.getPlayerData(uuid);
             if (playerData.inPvpCombat()) {
                 return () -> MessageService.getMessage(Messages.NoBuildPvP);
             }
@@ -278,7 +279,7 @@ public class ClaimService {
     public String allowBreak(Player player, Block block, Location location, BlockBreakEvent breakEvent) {
         if (!GriefPrevention.instance.claimsEnabledForWorld(location.getWorld())) return null;
 
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         Claim claim = getClaimAt(location, false, playerData.lastClaim);
 
         //exception: administrators in ignore claims mode
@@ -291,7 +292,7 @@ public class ClaimService {
                 String reason = MessageService.getMessage(Messages.NoBuildOutsideClaims);
                 if (player.hasPermission("griefprevention.ignoreclaims"))
                     reason += "  " + MessageService.getMessage(Messages.IgnoreClaimsAdvertisement);
-                reason += "  " + MessageService.getMessage(Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                reason += "  " + MessageService.getMessage(Messages.CreativeBasicsVideo2, PlayerDataRepository.CREATIVE_VIDEO_URL);
                 return reason;
             }
 
@@ -320,7 +321,7 @@ public class ClaimService {
     }
 
     public List<Claim> getClaims(UUID playerId, String playerName) {
-        return claimRepository.getClaims().stream().filter(c -> Objects.equals(c.getOwnerID(), playerId)).collect(Collectors.toList());
+        return dataStore.getClaims().stream().filter(c -> Objects.equals(c.getOwnerID(), playerId)).collect(Collectors.toList());
 //        PlayerData playerData = dataStore.getPlayerData(playerId);
 //        if (playerData.claims == null) {
 //            playerData.claims = new Vector<>();
@@ -403,21 +404,21 @@ public class ClaimService {
     }
 
     public List<Claim> deleteClaimsForPlayer(@NotNull UUID playerID, boolean releasePets) {
-        List<Claim> claimsToBeDeleted = claimRepository.getAllClaimsForPlayer(playerID);
-        claimRepository.deleteAllClaimsForPlayer(playerID);
+        List<Claim> claimsToBeDeleted = dataStore.getAllClaimsForPlayer(playerID);
+        dataStore.deleteAllClaimsForPlayer(playerID);
         claimsToBeDeleted.forEach(claim -> deleteClaim(claim, true, releasePets));
         return claimsToBeDeleted;
     }
 
     public void deleteAdminClaims(boolean releasePets) {
-        List<Claim> claimsToBeDeleted = claimRepository.getAllAdminClaims();
-        claimRepository.deleteAdminClaims();
+        List<Claim> claimsToBeDeleted = dataStore.getAllAdminClaims();
+        dataStore.deleteAdminClaims();
         claimsToBeDeleted.forEach(claim -> deleteClaim(claim, true, releasePets));
     }
 
     public void deleteClaim(Claim claim, boolean fireEvent, boolean releasePets) {
-        claimRepository.deleteClaimFromSecondaryStorage(claim);
-        claimRepository.removeFromChunkClaimMap(claim);
+        dataStore.deleteClaimFromSecondaryStorage(claim);
+        dataStore.removeFromChunkClaimMap(claim);
         if (fireEvent) {
             ClaimDeletedEvent ev = new ClaimDeletedEvent(claim, releasePets);
             BukkitUtils.sendEvent(ev);
@@ -454,7 +455,7 @@ public class ClaimService {
             aggressiveMode,
             ConfigLoader.creativeRulesApply(lesserBoundaryCorner),
             playerReceivingVisualization,
-            dataStore,
+            playerDataRepository,
             this);
         GriefPrevention.instance.getServer().getScheduler().runTaskLaterAsynchronously(GriefPrevention.instance, task, delayInTicks);
     }
@@ -477,11 +478,11 @@ public class ClaimService {
     //if you need to make changes, use provided methods like .deleteClaim() and .createClaim().
     //this will ensure primary memory (RAM) and secondary memory (disk, database) stay in sync
     public List<Claim> getClaims() {
-        return Collections.unmodifiableList(this.claimRepository.getClaims());
+        return Collections.unmodifiableList(this.dataStore.getClaims());
     }
 
     public ConcurrentHashMap<Long, ArrayList<Claim>> getChunksToClaimsMap() {
-        return claimRepository.getChunksToClaimsMap();
+        return dataStore.getChunksToClaimsMap();
     }
 
     public CreateClaimResult createClaim(World world, int x1, int x2, int y1, int y2, int z1, int z2, UUID ownerID, Claim parent, Integer id, Player creatingPlayer, boolean dryRun) {
@@ -492,7 +493,7 @@ public class ClaimService {
         if (newClaim.parent != null) {
             claimsToCheck = newClaim.parent.children;
         } else {
-            claimsToCheck = this.claimRepository.getClaims();
+            claimsToCheck = this.dataStore.getClaims();
         }
 
         for (Claim otherClaim : claimsToCheck) {
@@ -527,7 +528,7 @@ public class ClaimService {
 //            return result;
 //        }
         //otherwise add this new claim to the data store to make it effective
-        claimRepository.addClaim(newClaim, true);
+        dataStore.addClaim(newClaim, true);
 
         //then return success along with reference to new claim
         result.succeeded = true;
@@ -543,7 +544,7 @@ public class ClaimService {
 
         PlayerData ownerData = null;
         if (!claim.isAdminClaim()) {
-            ownerData = dataStore.getPlayerData(claim.ownerID);
+            ownerData = playerDataRepository.getPlayerData(claim.ownerID);
         }
 
         //call event
@@ -557,11 +558,11 @@ public class ClaimService {
         PlayerData newOwnerData = null;
 
         if (event.getNewOwner() != null) {
-            newOwnerData = dataStore.getPlayerData(event.getNewOwner());
+            newOwnerData = playerDataRepository.getPlayerData(event.getNewOwner());
         }
 
         claim.ownerID = event.getNewOwner();
-        claimRepository.saveClaim(claim);
+        dataStore.saveClaim(claim);
     }
 
     //gets all the claims "near" a location
@@ -575,7 +576,7 @@ public class ClaimService {
             for (int chunk_z = lesserChunk.getZ(); chunk_z <= greaterChunk.getZ(); chunk_z++) {
                 Chunk chunk = location.getWorld().getChunkAt(chunk_x, chunk_z);
                 Long chunkID = HelperUtil.getChunkHash(chunk.getBlock(0, 0, 0).getLocation());
-                ArrayList<Claim> claimsInChunk = claimRepository.getChunksToClaimsMap().get(chunkID);
+                ArrayList<Claim> claimsInChunk = dataStore.getChunksToClaimsMap().get(chunkID);
                 if (claimsInChunk != null) {
                     for (Claim claim : claimsInChunk) {
                         if (claim.inDataStore && claim.getLesserBoundaryCorner().getWorld().equals(location.getWorld())) {
@@ -590,10 +591,10 @@ public class ClaimService {
     }
 
     public Claim getClaimAt(Location location, boolean ignoreHeight, boolean ignoreSubclaims, Claim cachedClaim) {
-        return claimRepository.getClaimAt(location, ignoreHeight, ignoreSubclaims, cachedClaim);
+        return dataStore.getClaimAt(location, ignoreHeight, ignoreSubclaims, cachedClaim);
     }
 
     public Claim getClaimAt(Location location, boolean ignoreHeight, Claim cachedClaim) {
-        return claimRepository.getClaimAt(location, ignoreHeight, false, cachedClaim);
+        return dataStore.getClaimAt(location, ignoreHeight, false, cachedClaim);
     }
 }

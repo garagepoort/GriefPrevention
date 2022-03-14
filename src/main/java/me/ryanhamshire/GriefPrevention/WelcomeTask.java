@@ -25,7 +25,7 @@ public class WelcomeTask implements Runnable
 
         //offer advice and a helpful link
         MessageService.sendMessage(player, TextMode.Instr, Messages.AvoidGriefClaimLand);
-        MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+        MessageService.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, PlayerDataRepository.SURVIVAL_VIDEO_URL);
 
         //give the player a reference book for later
         if (ConfigLoader.config_claims_supplyPlayerManual)
@@ -37,7 +37,7 @@ public class WelcomeTask implements Runnable
             meta.setTitle(MessageService.getMessage(Messages.BookTitle));
 
             StringBuilder page1 = new StringBuilder();
-            String URL = MessageService.getMessage(Messages.BookLink, DataStore.SURVIVAL_VIDEO_URL);
+            String URL = MessageService.getMessage(Messages.BookLink, PlayerDataRepository.SURVIVAL_VIDEO_URL);
             String intro = MessageService.getMessage(Messages.BookIntro);
 
             page1.append(URL).append("\n\n");

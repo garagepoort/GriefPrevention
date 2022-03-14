@@ -21,7 +21,6 @@ package me.ryanhamshire.GriefPrevention;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
-import me.ryanhamshire.GriefPrevention.claims.ClaimRepository;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.claims.ResizeClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
@@ -90,21 +89,21 @@ import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 @IocBean
 @IocListener
 public class BlockEventHandler implements Listener {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ClaimService claimService;
     private final ClaimBlockService claimBlockService;
 
     private final EnumSet<Material> trashBlocks;
     private final ResizeClaimService resizeClaimService;
-    private final ClaimRepository claimRepository;
+    private final DataStore dataStore;
 
     //constructor
-    public BlockEventHandler(DataStore dataStore, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, ClaimRepository claimRepository) {
-        this.dataStore = dataStore;
+    public BlockEventHandler(PlayerDataRepository playerDataRepository, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, DataStore dataStore) {
+        this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
         this.claimBlockService = claimBlockService;
         this.resizeClaimService = resizeClaimService;
-        this.claimRepository = claimRepository;
+        this.dataStore = dataStore;
 
         //create the list of blocks which will not trigger a warning when they're placed outside of land claims
         this.trashBlocks = EnumSet.noneOf(Material.class);
@@ -176,7 +175,7 @@ public class BlockEventHandler implements Listener {
             return;
         }
 
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         //if not empty and wasn't the same as the last sign, log it and remember it for later
         //This has been temporarily removed since `signMessage` includes location, not just the message. Waste of memory IMO
         //if(notEmpty && (playerData.lastSignMessage == null || !playerData.lastSignMessage.equals(signMessage)))
@@ -258,7 +257,7 @@ public class BlockEventHandler implements Listener {
         String noBuildReason = claimService.allowBuild(player, block.getLocation(), block.getType());
         if (noBuildReason != null) {
             // Allow players with container trust to place books in lecterns
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(block.getLocation(), true, playerData.lastClaim);
             if (block.getType() == Material.LECTERN && placeEvent.getBlockReplacedState().getType() == Material.LECTERN) {
                 if (claim != null) {
@@ -278,7 +277,7 @@ public class BlockEventHandler implements Listener {
         }
 
         //if the block is being placed within or under an existing claim
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
         Claim claim = this.claimService.getClaimAt(block.getLocation(), true, playerData.lastClaim);
 
         //If block is a chest, don't allow a DoubleChest to form across a claim boundary
@@ -375,7 +374,7 @@ public class BlockEventHandler implements Listener {
                         }
                     }
 
-                    sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                    sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, PlayerDataRepository.SURVIVAL_VIDEO_URL);
                 }
 
                 //check to see if this chest is in a claim, and warn when it isn't
@@ -411,7 +410,7 @@ public class BlockEventHandler implements Listener {
                         playerData.buildWarningTimestamp = now;
 
                         if (claims.size() < 2) {
-                            sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                            sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, PlayerDataRepository.SURVIVAL_VIDEO_URL);
                         }
 
                         if (playerData.lastClaim != null) {
@@ -664,7 +663,7 @@ public class BlockEventHandler implements Listener {
         //don't track in worlds where claims are not enabled
         if (!GriefPrevention.instance.claimsEnabledForWorld(igniteEvent.getBlock().getWorld())) return;
 
-        if (igniteEvent.getCause() == IgniteCause.LIGHTNING && claimRepository.getClaimAt(igniteEvent.getIgnitingEntity().getLocation(), false, null) != null) {
+        if (igniteEvent.getCause() == IgniteCause.LIGHTNING && dataStore.getClaimAt(igniteEvent.getIgnitingEntity().getLocation(), false, null) != null) {
             igniteEvent.setCancelled(true); //BlockIgniteEvent is called before LightningStrikeEvent. See #532. However, see #1125 for further discussion on detecting trident-caused lightning.
         }
 
@@ -672,8 +671,8 @@ public class BlockEventHandler implements Listener {
         if (igniteEvent.getCause() == IgniteCause.FIREBALL && igniteEvent.getIgnitingEntity() instanceof Fireball) {
             ProjectileSource shooter = ((Fireball) igniteEvent.getIgnitingEntity()).getShooter();
             if (shooter instanceof BlockProjectileSource) {
-                Claim claim = claimRepository.getClaimAt(igniteEvent.getBlock().getLocation(), false, null);
-                if (claim != null && claimRepository.getClaimAt(((BlockProjectileSource) shooter).getBlock().getLocation(), false, claim) == claim) {
+                Claim claim = dataStore.getClaimAt(igniteEvent.getBlock().getLocation(), false, null);
+                if (claim != null && dataStore.getClaimAt(((BlockProjectileSource) shooter).getBlock().getLocation(), false, claim) == claim) {
                     return;
                 }
             }
@@ -802,7 +801,7 @@ public class BlockEventHandler implements Listener {
         if (ConfigLoader.creativeRulesApply(location)) {
             Material type = block.getType();
             if (type == Material.COBBLESTONE || type == Material.OBSIDIAN || type == Material.LAVA || type == Material.WATER) {
-                Claim claim = claimRepository.getClaimAt(location, false, null);
+                Claim claim = dataStore.getClaimAt(location, false, null);
                 if (claim == null) {
                     event.setCancelled(true);
                 }
@@ -822,7 +821,7 @@ public class BlockEventHandler implements Listener {
         if (block == null || block.getType() != Material.CHORUS_FLOWER)
             return;
 
-        Claim claim = claimRepository.getClaimAt(block.getLocation(), false, null);
+        Claim claim = dataStore.getClaimAt(block.getLocation(), false, null);
         if (claim == null)
             return;
 
@@ -934,7 +933,7 @@ public class BlockEventHandler implements Listener {
                 //has that player unlocked his drops?
                 OfflinePlayer owner = GriefPrevention.instance.getServer().getOfflinePlayer(ownerID);
                 if (owner.isOnline()) {
-                    PlayerData playerData = this.dataStore.getPlayerData(ownerID);
+                    PlayerData playerData = this.playerDataRepository.getPlayerData(ownerID);
 
                     //if locked, don't allow pickup
                     if (!playerData.dropsAreUnlocked) {

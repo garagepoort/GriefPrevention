@@ -2,8 +2,8 @@ package me.ryanhamshire.GriefPrevention.database;
 
 import be.garagepoort.mcioc.IocBeanProvider;
 import be.garagepoort.mcioc.TubingConfiguration;
-import me.ryanhamshire.GriefPrevention.DataStore;
-import me.ryanhamshire.GriefPrevention.DatabaseDataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
+import me.ryanhamshire.GriefPrevention.DatabasePlayerDataRepository;
 
 import static be.garagepoort.mcioc.TubingPlugin.getPlugin;
 import static me.ryanhamshire.GriefPrevention.GriefPrevention.AddLogEntry;
@@ -12,9 +12,9 @@ import static me.ryanhamshire.GriefPrevention.GriefPrevention.AddLogEntry;
 public class DataStoreInitializer {
 
     @IocBeanProvider
-    public static DataStore instantiateDataStore(SqlConnectionProvider sqlConnectionProvider) {
+    public static PlayerDataRepository instantiateDataStore(SqlConnectionProvider sqlConnectionProvider) {
         try {
-            DatabaseDataStore databaseStore = new DatabaseDataStore(sqlConnectionProvider);
+            DatabasePlayerDataRepository databaseStore = new DatabasePlayerDataRepository(sqlConnectionProvider);
             AddLogEntry("Finished loading data (Database Mode).");
             return databaseStore;
         } catch (Exception e) {

@@ -4,7 +4,7 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.ClaimPermission;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -24,14 +24,14 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("trapped")
 public class TrappedCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     private final PlayerRescueService playerRescueService;
     private final ClaimService claimService;
 
 
-    public TrappedCmd(DataStore dataStore, BukkitUtils bukkitUtils, PlayerRescueService playerRescueService, ClaimService claimService) {
-        this.dataStore = dataStore;
+    public TrappedCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils, PlayerRescueService playerRescueService, ClaimService claimService) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         this.playerRescueService = playerRescueService;
 
@@ -45,7 +45,7 @@ public class TrappedCmd extends AbstractCmd {
         bukkitUtils.runTaskAsync(sender, () -> {
             //FEATURE: empower players who get "stuck" in an area where they don't have permission to build to save themselves
 
-            PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = this.playerDataRepository.getPlayerData(player.getUniqueId());
             Claim claim = this.claimService.getClaimAt(player.getLocation(), false, playerData.lastClaim);
 
             //if another /trapped is pending, ignore this slash command
@@ -79,7 +79,7 @@ public class TrappedCmd extends AbstractCmd {
                 MessageService.sendMessage(player, TextMode.Instr, Messages.RescuePending);
 
                 //create a task to rescue this player in a little while
-                PlayerRescueTask task = new PlayerRescueTask(player, player.getLocation(), event.getDestination(), dataStore, playerRescueService);
+                PlayerRescueTask task = new PlayerRescueTask(player, player.getLocation(), event.getDestination(), playerDataRepository, playerRescueService);
                 Bukkit.getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 200L);  //20L ~ 1 second
             });
         });

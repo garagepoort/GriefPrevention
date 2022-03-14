@@ -2,7 +2,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -16,12 +16,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("unseparate")
 public class UnseparateCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     
 
-    public UnseparateCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public UnseparateCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         
     }
@@ -55,7 +55,7 @@ public class UnseparateCmd extends AbstractCmd {
     }
 
     private void setIgnoreStatus(OfflinePlayer ignorer, OfflinePlayer ignoree, GriefPrevention.IgnoreMode mode) {
-        PlayerData playerData = this.dataStore.getPlayerData(ignorer.getUniqueId());
+        PlayerData playerData = this.playerDataRepository.getPlayerData(ignorer.getUniqueId());
         if (mode == GriefPrevention.IgnoreMode.None) {
             playerData.ignoredPlayers.remove(ignoree.getUniqueId());
         } else {
@@ -64,8 +64,8 @@ public class UnseparateCmd extends AbstractCmd {
 
         playerData.ignoreListChanged = true;
         if (!ignorer.isOnline()) {
-            this.dataStore.savePlayerData(ignorer.getUniqueId(), playerData);
-            this.dataStore.clearCachedPlayerData(ignorer.getUniqueId());
+            this.playerDataRepository.savePlayerData(ignorer.getUniqueId(), playerData);
+            this.playerDataRepository.clearCachedPlayerData(ignorer.getUniqueId());
         }
     }
 }

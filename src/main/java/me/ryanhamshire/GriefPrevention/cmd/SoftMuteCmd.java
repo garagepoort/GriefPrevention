@@ -3,7 +3,7 @@ package me.ryanhamshire.GriefPrevention.cmd;
 import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -16,12 +16,12 @@ import org.bukkit.entity.Player;
 @IocBean
 @IocCommandHandler("softmute")
 public class SoftMuteCmd extends AbstractCmd {
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final BukkitUtils bukkitUtils;
     
 
-    public SoftMuteCmd(DataStore dataStore, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public SoftMuteCmd(PlayerDataRepository playerDataRepository, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.bukkitUtils = bukkitUtils;
         
     }
@@ -40,7 +40,7 @@ public class SoftMuteCmd extends AbstractCmd {
             return true;
         }
         bukkitUtils.runTaskAsync(sender, () -> {
-            boolean isMuted = this.dataStore.toggleSoftMute(targetPlayer.getUniqueId());
+            boolean isMuted = this.playerDataRepository.toggleSoftMute(targetPlayer.getUniqueId());
             if (isMuted) {
                 MessageService.sendMessage(player, TextMode.Success, Messages.SoftMuted, targetPlayer.getName());
                 String executorName = "console";

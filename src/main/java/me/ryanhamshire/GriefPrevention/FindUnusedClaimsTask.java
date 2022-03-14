@@ -42,13 +42,13 @@ public class FindUnusedClaimsTask extends BukkitRunnable
 {
     private List<UUID> claimOwnerUUIDs;
     private Iterator<UUID> claimOwnerIterator;
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final ClaimBlockService claimBlockService;
     private final ClaimService claimService;
 
-    public FindUnusedClaimsTask(DataStore dataStore, ClaimBlockService claimBlockService, ClaimService claimService)
+    public FindUnusedClaimsTask(PlayerDataRepository playerDataRepository, ClaimBlockService claimBlockService, ClaimService claimService)
     {
-        this.dataStore = dataStore;
+        this.playerDataRepository = playerDataRepository;
         this.claimBlockService = claimBlockService;
         this.claimService = claimService;
         refreshUUIDs();
@@ -70,7 +70,7 @@ public class FindUnusedClaimsTask extends BukkitRunnable
         }
 
         GriefPrevention.instance.getServer().getScheduler().runTaskAsynchronously(GriefPrevention.instance,
-            new CleanupUnusedClaimPreTask(claimOwnerIterator.next(), dataStore, claimBlockService, claimService));
+            new CleanupUnusedClaimPreTask(claimOwnerIterator.next(), playerDataRepository, claimBlockService, claimService));
     }
 
     public void refreshUUIDs()

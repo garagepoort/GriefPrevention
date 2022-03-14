@@ -4,6 +4,7 @@ import be.garagepoort.mcioc.IocBean;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.CreateClaimResult;
 import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -30,14 +31,14 @@ public class ResizeClaimService {
 
     private final ClaimBlockService claimBlockService;
     private final ClaimService claimService;
+    private final PlayerDataRepository playerDataRepository;
     private final DataStore dataStore;
-    private final ClaimRepository claimRepository;
 
-    public ResizeClaimService(ClaimBlockService claimBlockService, ClaimService claimService, DataStore dataStore, ClaimRepository claimRepository) {
+    public ResizeClaimService(ClaimBlockService claimBlockService, ClaimService claimService, PlayerDataRepository playerDataRepository, DataStore dataStore) {
         this.claimBlockService = claimBlockService;
         this.claimService = claimService;
+        this.playerDataRepository = playerDataRepository;
         this.dataStore = dataStore;
-        this.claimRepository = claimRepository;
     }
 
     public void resizeClaimWithChecks(Player player, PlayerData playerData, int newx1, int newx2, int newy1, int newy2, int newz1, int newz2) {
@@ -124,7 +125,7 @@ public class ResizeClaimService {
                 if (ownerID == player.getUniqueId()) {
                     claimBlocksRemaining = claimBlockService.getRemainingClaimBlocks(playerData, claimService.getClaims(player.getUniqueId(), player.getName()));
                 } else {
-                    PlayerData ownerData = dataStore.getPlayerData(ownerID);
+                    PlayerData ownerData = playerDataRepository.getPlayerData(ownerID);
                     claimBlocksRemaining = claimBlockService.getRemainingClaimBlocks(ownerData, claimService.getClaims(ownerID, ownerName));
                 }
             }
@@ -142,7 +143,7 @@ public class ResizeClaimService {
             //if increased to a sufficiently large size and no subdivisions yet, send subdivision instructions
             if (oldClaim.getArea() < 1000 && result.claim.getArea() >= 1000 && result.claim.children.size() == 0 && !player.hasPermission("griefprevention.adminclaims")) {
                 MessageService.sendMessage(player, TextMode.Info, Messages.BecomeMayor, 200L);
-                MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, 201L, DataStore.SUBDIVISION_VIDEO_URL);
+                MessageService.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, 201L, PlayerDataRepository.SUBDIVISION_VIDEO_URL);
             }
 
             //if in a creative mode world and shrinking an existing claim, restore any unclaimed area
@@ -176,7 +177,7 @@ public class ResizeClaimService {
 
         //if succeeded
         if (result.succeeded) {
-            claimRepository.removeFromChunkClaimMap(claim); // remove the old boundary from the chunk cache
+            dataStore.removeFromChunkClaimMap(claim); // remove the old boundary from the chunk cache
             // copy the boundary from the claim created in the dry run of createClaim() to our existing claim
             claim.lesserBoundaryCorner = result.claim.lesserBoundaryCorner;
             claim.greaterBoundaryCorner = result.claim.greaterBoundaryCorner;
@@ -184,7 +185,7 @@ public class ResizeClaimService {
             // Also saves affected claims.
             setNewDepth(claim, claim.getLesserBoundaryCorner().getBlockY());
             result.claim = claim;
-            claimRepository.addToChunkClaimMap(claim); // add the new boundary to the chunk cache
+            dataStore.addToChunkClaimMap(claim); // add the new boundary to the chunk cache
         }
 
         return result;
@@ -219,7 +220,7 @@ public class ResizeClaimService {
         Stream.concat(Stream.of(claim), claim.children.stream()).forEach(localClaim -> {
             localClaim.lesserBoundaryCorner.setY(depth);
             localClaim.greaterBoundaryCorner.setY(Math.max(localClaim.greaterBoundaryCorner.getBlockY(), depth));
-            claimRepository.saveClaim(localClaim);
+            dataStore.saveClaim(localClaim);
         });
     }
 

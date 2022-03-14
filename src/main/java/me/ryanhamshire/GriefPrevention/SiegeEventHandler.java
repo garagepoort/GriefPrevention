@@ -18,10 +18,10 @@ import org.bukkit.event.player.PlayerInteractEvent;
 public class SiegeEventHandler implements Listener
 {
 
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
 
-    public SiegeEventHandler(DataStore dataStore) {
-        this.dataStore = dataStore;
+    public SiegeEventHandler(PlayerDataRepository playerDataRepository) {
+        this.playerDataRepository = playerDataRepository;
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -59,7 +59,7 @@ public class SiegeEventHandler implements Listener
         if (event.getRequiredPermission() == ClaimPermission.Inventory)
         {
             // Trying to access inventory in a claim may extend an existing siege to include this claim.
-            dataStore.tryExtendSiege(player, claim);
+            playerDataRepository.tryExtendSiege(player, claim);
 
             if (claim.siegeData != null)
                 event.setDenialReason(() -> MessageService.getMessage(Messages.NoContainersSiege, claim.siegeData.attacker.getName()));
@@ -68,7 +68,7 @@ public class SiegeEventHandler implements Listener
         }
 
         // When a player tries to build in a claim, if he's under siege, the siege may extend to include the new claim.
-        dataStore.tryExtendSiege(player, claim);
+        playerDataRepository.tryExtendSiege(player, claim);
 
         // If claim is not under siege and doors are not open, use default behavior.
         if (claim.siegeData == null && !claim.doorsOpen)

@@ -4,7 +4,7 @@ import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.ClaimsMode;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.IgnoreLoaderThread;
 import me.ryanhamshire.GriefPrevention.MessageService;
@@ -38,7 +38,7 @@ import java.util.UUID;
 @IocListener
 public class OnPlayerJoin implements Listener {
 
-    private final DataStore dataStore;
+    private final PlayerDataRepository playerDataRepository;
     private final SessionManager sessionManager;
     private final ClaimService claimService;
     private final PvpProtectionService pvpProtectionService;
@@ -46,8 +46,8 @@ public class OnPlayerJoin implements Listener {
     private final LogoutMessagesService logoutMessagesService;
     private final BukkitUtils bukkitUtils;
 
-    public OnPlayerJoin(DataStore dataStore, SessionManager sessionManager, ClaimService claimService, PvpProtectionService pvpProtectionService, NotificationService notificationService, LogoutMessagesService logoutMessagesService, BukkitUtils bukkitUtils) {
-        this.dataStore = dataStore;
+    public OnPlayerJoin(PlayerDataRepository playerDataRepository, SessionManager sessionManager, ClaimService claimService, PvpProtectionService pvpProtectionService, NotificationService notificationService, LogoutMessagesService logoutMessagesService, BukkitUtils bukkitUtils) {
+        this.playerDataRepository = playerDataRepository;
         this.sessionManager = sessionManager;
         this.claimService = claimService;
         this.pvpProtectionService = pvpProtectionService;
@@ -65,7 +65,7 @@ public class OnPlayerJoin implements Listener {
             event.setJoinMessage(null);
         }
 
-        PlayerData playerData = this.dataStore.getPlayerData(playerID);
+        PlayerData playerData = this.playerDataRepository.getPlayerData(playerID);
         bukkitUtils.runTaskAsync(event.getPlayer(), () -> {
             playerData.lastSpawn = new Date().getTime();
             this.sessionManager.addSession(playerID);
@@ -103,7 +103,7 @@ public class OnPlayerJoin implements Listener {
                 for (Player onlinePlayer : players) {
                     if (onlinePlayer.getUniqueId().equals(player.getUniqueId())) continue;
 
-                    PlayerData otherData = dataStore.getPlayerData(onlinePlayer.getUniqueId());
+                    PlayerData otherData = playerDataRepository.getPlayerData(onlinePlayer.getUniqueId());
                     if (ipAddress.equals(otherData.ipAddress) && isNewToServer(onlinePlayer)) {
                         ipCount++;
                     }

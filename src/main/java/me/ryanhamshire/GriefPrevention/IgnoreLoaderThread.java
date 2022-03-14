@@ -24,7 +24,7 @@ public class IgnoreLoaderThread extends Thread
     @Override
     public void run()
     {
-        File ignoreFile = new File(DataStore.playerDataFolderPath + File.separator + this.playerToLoad + ".ignore");
+        File ignoreFile = new File(PlayerDataRepository.playerDataFolderPath + File.separator + this.playerToLoad + ".ignore");
 
         //if the file doesn't exist, there's nothing to do here
         if (!ignoreFile.exists()) return;
