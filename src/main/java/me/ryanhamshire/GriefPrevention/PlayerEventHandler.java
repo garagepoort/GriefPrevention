@@ -313,38 +313,7 @@ public class PlayerEventHandler implements Listener {
             }
         }
 
-        //take action based on spam detector results
-        if (result.shouldBanChatter) {
-            if (ConfigLoader.config_spam_banOffenders) {
-                //log entry
-                GriefPrevention.AddLogEntry("Banning " + player.getName() + " for spam.", CustomLogEntryTypes.AdminActivity);
-
-                //kick and ban
-                PlayerKickBanTask task = new PlayerKickBanTask(player, ConfigLoader.config_spam_banMessage, "GriefPrevention Anti-Spam", true);
-                GriefPrevention.get().getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 1L);
-            } else {
-                //log entry
-                GriefPrevention.AddLogEntry("Kicking " + player.getName() + " for spam.", CustomLogEntryTypes.AdminActivity);
-
-                //just kick
-                PlayerKickBanTask task = new PlayerKickBanTask(player, "", "GriefPrevention Anti-Spam", false);
-                GriefPrevention.get().getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.get(), task, 1L);
-            }
-        } else if (result.shouldWarnChatter) {
-            //warn and log
-            MessageService.sendMessage(player, TextMode.Warn, ConfigLoader.config_spam_warningMessage, 10L);
-            GriefPrevention.AddLogEntry("Warned " + player.getName() + " about spam penalties.", CustomLogEntryTypes.Debug, true);
-        }
-
-        if (result.muteReason != null) {
-            //mute and log
-            GriefPrevention.AddLogEntry("Muted " + result.muteReason + ".");
-            GriefPrevention.AddLogEntry("Muted " + player.getName() + " " + result.muteReason + ":" + message, CustomLogEntryTypes.Debug, true);
-
-            return true;
-        }
-
-        return false;
+        return true;
     }
 
     //when a player uses a slash command...
