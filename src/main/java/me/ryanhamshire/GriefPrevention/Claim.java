@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import me.ryanhamshire.GriefPrevention.util.BoundingBox;
 import me.ryanhamshire.GriefPrevention.util.HelperUtil;
@@ -32,6 +33,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -43,12 +46,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 //represents a player claim
 //creating an instance doesn't make an effective claim
 //only claims which have been added to the datastore have any effect
-public class Claim
-{
+public class Claim {
     //two locations, which together define the boundaries of the claim
     //note that the upper Y value is always ignored, because claims ALWAYS extend up to the sky
     public Location lesserBoundaryCorner;
@@ -98,29 +101,25 @@ public class Claim
 
     //whether or not this is an administrative claim
     //administrative claims are created and maintained by players with the griefprevention.adminclaims permission.
-    public boolean isAdminClaim()
-    {
+    public boolean isAdminClaim() {
         return this.getOwnerID() == null;
     }
 
     //accessor for ID
-    public Integer getID()
-    {
+    public Integer getID() {
         return this.id;
     }
 
     //basic constructor, just notes the creation time
     //see above declarations for other defaults
-    Claim()
-    {
+    Claim() {
         this.modifiedDate = Calendar.getInstance().getTime();
     }
 
     //removes any lava above sea level in a claim
     //exclusionClaim is another claim indicating an sub-area to be excluded from this operation
     //it may be null
-    public void removeSurfaceFluids(Claim exclusionClaim)
-    {
+    public void removeSurfaceFluids(Claim exclusionClaim) {
         //don't do this for administrative claims
         if (this.isAdminClaim()) return;
 
@@ -141,18 +140,14 @@ public class Claim
         if (lesser.getWorld().getEnvironment() == Environment.NORMAL)
             seaLevel = GriefPrevention.instance.getSeaLevel(lesser.getWorld());
 
-        for (int x = lesser.getBlockX(); x <= greater.getBlockX(); x++)
-        {
-            for (int z = lesser.getBlockZ(); z <= greater.getBlockZ(); z++)
-            {
-                for (int y = seaLevel - 1; y <= lesser.getWorld().getMaxHeight(); y++)
-                {
+        for (int x = lesser.getBlockX(); x <= greater.getBlockX(); x++) {
+            for (int z = lesser.getBlockZ(); z <= greater.getBlockZ(); z++) {
+                for (int y = seaLevel - 1; y <= lesser.getWorld().getMaxHeight(); y++) {
                     //dodge the exclusion claim
                     Block block = lesser.getWorld().getBlockAt(x, y, z);
                     if (exclusionClaim != null && exclusionClaim.contains(block.getLocation(), true, false)) continue;
 
-                    if (block.getType() == Material.LAVA || block.getType() == Material.WATER)
-                    {
+                    if (block.getType() == Material.LAVA || block.getType() == Material.WATER) {
                         block.setType(Material.AIR);
                     }
                 }
@@ -162,8 +157,7 @@ public class Claim
 
     //determines whether or not a claim has surface lava
     //used to warn players when they abandon their claims about automatic fluid cleanup
-    boolean hasSurfaceFluids()
-    {
+    boolean hasSurfaceFluids() {
         Location lesser = this.getLesserBoundaryCorner();
         Location greater = this.getGreaterBoundaryCorner();
 
@@ -176,17 +170,13 @@ public class Claim
         if (lesser.getWorld().getEnvironment() == Environment.NORMAL)
             seaLevel = GriefPrevention.instance.getSeaLevel(lesser.getWorld());
 
-        for (int x = lesser.getBlockX(); x <= greater.getBlockX(); x++)
-        {
-            for (int z = lesser.getBlockZ(); z <= greater.getBlockZ(); z++)
-            {
-                for (int y = seaLevel - 1; y <= lesser.getWorld().getMaxHeight(); y++)
-                {
+        for (int x = lesser.getBlockX(); x <= greater.getBlockX(); x++) {
+            for (int z = lesser.getBlockZ(); z <= greater.getBlockZ(); z++) {
+                for (int y = seaLevel - 1; y <= lesser.getWorld().getMaxHeight(); y++) {
                     //dodge the exclusion claim
                     Block block = lesser.getWorld().getBlockAt(x, y, z);
 
-                    if (block.getType() == Material.WATER || block.getType() == Material.LAVA)
-                    {
+                    if (block.getType() == Material.WATER || block.getType() == Material.LAVA) {
                         return true;
                     }
                 }
@@ -197,8 +187,7 @@ public class Claim
     }
 
     //main constructor.  note that only creating a claim instance does nothing - a claim must be added to the data store to be effective
-    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Integer id)
-    {
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Integer id) {
         //modification date
         this.modifiedDate = Calendar.getInstance().getTime();
 
@@ -213,25 +202,20 @@ public class Claim
         this.ownerID = ownerID;
 
         //other permissions
-        for (String builderID : builderIDs)
-        {
+        for (String builderID : builderIDs) {
             this.setPermission(builderID, ClaimPermission.Build);
         }
 
-        for (String containerID : containerIDs)
-        {
+        for (String containerID : containerIDs) {
             this.setPermission(containerID, ClaimPermission.Inventory);
         }
 
-        for (String accessorID : accessorIDs)
-        {
+        for (String accessorID : accessorIDs) {
             this.setPermission(accessorID, ClaimPermission.Access);
         }
 
-        for (String managerID : managerIDs)
-        {
-            if (managerID != null && !managerID.isEmpty())
-            {
+        for (String managerID : managerIDs) {
+            if (managerID != null && !managerID.isEmpty()) {
                 this.managers.add(managerID);
             }
         }
@@ -239,8 +223,7 @@ public class Claim
         this.inheritNothing = inheritNothing;
     }
 
-    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Integer id)
-    {
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Integer id) {
         this(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderIDs, containerIDs, accessorIDs, managerIDs, false, id);
     }
 
@@ -263,60 +246,53 @@ public class Claim
     }
 
     //measurements.  all measurements are in blocks
-    public int getArea()
-    {
+    public int getArea() {
         int claimWidth = this.greaterBoundaryCorner.getBlockX() - this.lesserBoundaryCorner.getBlockX() + 1;
         int claimHeight = this.greaterBoundaryCorner.getBlockZ() - this.lesserBoundaryCorner.getBlockZ() + 1;
 
         return claimWidth * claimHeight;
     }
 
-    public int getWidth()
-    {
+    public int getWidth() {
         return this.greaterBoundaryCorner.getBlockX() - this.lesserBoundaryCorner.getBlockX() + 1;
     }
 
-    public int getHeight()
-    {
+    public int getHeight() {
         return this.greaterBoundaryCorner.getBlockZ() - this.lesserBoundaryCorner.getBlockZ() + 1;
     }
 
-    public boolean getSubclaimRestrictions()
-    {
+    public boolean getSubclaimRestrictions() {
         return inheritNothing;
     }
 
-    public void setSubclaimRestrictions(boolean inheritNothing)
-    {
+    public void setSubclaimRestrictions(boolean inheritNothing) {
         this.inheritNothing = inheritNothing;
     }
 
     //distance check for claims, distance in this case is a band around the outside of the claim rather then euclidean distance
-    public boolean isNear(Location location, int howNear)
-    {
+    public boolean isNear(Location location, int howNear) {
         Claim claim = new Claim
-                (new Location(this.lesserBoundaryCorner.getWorld(), this.lesserBoundaryCorner.getBlockX() - howNear, this.lesserBoundaryCorner.getBlockY(), this.lesserBoundaryCorner.getBlockZ() - howNear),
-                        new Location(this.greaterBoundaryCorner.getWorld(), this.greaterBoundaryCorner.getBlockX() + howNear, this.greaterBoundaryCorner.getBlockY(), this.greaterBoundaryCorner.getBlockZ() + howNear),
-                        null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), null);
+            (new Location(this.lesserBoundaryCorner.getWorld(), this.lesserBoundaryCorner.getBlockX() - howNear, this.lesserBoundaryCorner.getBlockY(), this.lesserBoundaryCorner.getBlockZ() - howNear),
+                new Location(this.greaterBoundaryCorner.getWorld(), this.greaterBoundaryCorner.getBlockX() + howNear, this.greaterBoundaryCorner.getBlockY(), this.greaterBoundaryCorner.getBlockZ() + howNear),
+                null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), null);
 
         return claim.contains(location, false, true);
     }
 
     private static final Set<Material> PLACEABLE_FARMING_BLOCKS = EnumSet.of(
-            Material.PUMPKIN_STEM,
-            Material.WHEAT,
-            Material.MELON_STEM,
-            Material.CARROTS,
-            Material.POTATOES,
-            Material.NETHER_WART,
-            Material.BEETROOTS,
-            Material.COCOA,
-            Material.GLOW_BERRIES,
-            Material.CAVE_VINES,
-            Material.CAVE_VINES_PLANT);
+        Material.PUMPKIN_STEM,
+        Material.WHEAT,
+        Material.MELON_STEM,
+        Material.CARROTS,
+        Material.POTATOES,
+        Material.NETHER_WART,
+        Material.BEETROOTS,
+        Material.COCOA,
+        Material.GLOW_BERRIES,
+        Material.CAVE_VINES,
+        Material.CAVE_VINES_PLANT);
 
-    public static boolean placeableForFarming(Material material)
-    {
+    public static boolean placeableForFarming(Material material) {
         return PLACEABLE_FARMING_BLOCKS.contains(material);
     }
 
@@ -328,37 +304,30 @@ public class Claim
         }
     }
 
-    public static class CompatBuildBreakEvent extends Event
-    {
+    public static class CompatBuildBreakEvent extends Event {
         private final Material material;
         private final boolean isBreak;
 
-        private CompatBuildBreakEvent(Material material, boolean isBreak)
-        {
+        private CompatBuildBreakEvent(Material material, boolean isBreak) {
             this.material = material;
             this.isBreak = isBreak;
         }
 
-        public Material getMaterial()
-        {
+        public Material getMaterial() {
             return material;
         }
 
-        public boolean isBreak()
-        {
+        public boolean isBreak() {
             return isBreak;
         }
 
         @Override
-        public HandlerList getHandlers()
-        {
+        public HandlerList getHandlers() {
             return new HandlerList();
         }
-
     }
 
-    public boolean hasExplicitPermission(UUID uuid, ClaimPermission level)
-    {
+    public boolean hasExplicitPermission(UUID uuid, ClaimPermission level) {
         if (uuid.equals(this.getOwnerID())) return true;
 
         if (level == ClaimPermission.Manage) return this.managers.contains(uuid.toString());
@@ -366,16 +335,13 @@ public class Claim
         return level.isGrantedBy(this.playerIDToClaimPermissionMap.get(uuid.toString()));
     }
 
-    public boolean hasExplicitPermission(Player player, ClaimPermission level)
-    {
+    public boolean hasExplicitPermission(Player player, ClaimPermission level) {
         // Check explicit ClaimPermission for UUID
         if (this.hasExplicitPermission(player.getUniqueId(), level)) return true;
 
         // Special case managers - a separate list is used.
-        if (level == ClaimPermission.Manage)
-        {
-            for (String node : this.managers)
-            {
+        if (level == ClaimPermission.Manage) {
+            for (String node : this.managers) {
                 // Ensure valid permission format for permissions - [permission.node]
                 if (node.length() < 3 || node.charAt(0) != '[' || node.charAt(node.length() - 1) != ']') continue;
                 // Check if player has node
@@ -385,31 +351,28 @@ public class Claim
         }
 
         // Check permission-based ClaimPermission
-        for (Map.Entry<String, ClaimPermission> stringToPermission : this.playerIDToClaimPermissionMap.entrySet())
-        {
+        for (Map.Entry<String, ClaimPermission> stringToPermission : this.playerIDToClaimPermissionMap.entrySet()) {
             String node = stringToPermission.getKey();
             // Ensure valid permission format for permissions - [permission.node]
             if (node.length() < 3 || node.charAt(0) != '[' || node.charAt(node.length() - 1) != ']') continue;
 
             // Check if level is high enough and player has node
             if (level.isGrantedBy(stringToPermission.getValue())
-                    && player.hasPermission(node.substring(1, node.length() - 1)))
+                && player.hasPermission(node.substring(1, node.length() - 1)))
                 return true;
         }
 
         return false;
     }
 
-    public ClaimPermission getPermission(String playerID)
-    {
+    public ClaimPermission getPermission(String playerID) {
         if (playerID == null || playerID.isEmpty()) return null;
 
         return this.playerIDToClaimPermissionMap.get(playerID.toLowerCase());
     }
 
     //grants a permission for a player or the public
-    public void setPermission(String playerID, ClaimPermission permissionLevel)
-    {
+    public void setPermission(String playerID, ClaimPermission permissionLevel) {
         if (permissionLevel == ClaimPermission.Edit) throw new IllegalArgumentException("Cannot add editors!");
 
         if (playerID == null || playerID.isEmpty()) return;
@@ -421,48 +384,37 @@ public class Claim
     }
 
     //revokes a permission for a player or the public
-    public void dropPermission(String playerID)
-    {
+    public void dropPermission(String playerID) {
         playerID = playerID.toLowerCase();
         this.playerIDToClaimPermissionMap.remove(playerID);
         this.managers.remove(playerID);
 
-        for (Claim child : this.children)
-        {
+        for (Claim child : this.children) {
             child.dropPermission(playerID);
         }
     }
 
     //clears all permissions (except owner of course)
-    public void clearPermissions()
-    {
+    public void clearPermissions() {
         this.playerIDToClaimPermissionMap.clear();
         this.managers.clear();
 
-        for (Claim child : this.children)
-        {
+        for (Claim child : this.children) {
             child.clearPermissions();
         }
     }
 
     //gets ALL permissions
     //useful for  making copies of permissions during a claim resize and listing all permissions in a claim
-    public void getPermissions(ArrayList<String> builders, ArrayList<String> containers, ArrayList<String> accessors, ArrayList<String> managers)
-    {
+    public void getPermissions(ArrayList<String> builders, ArrayList<String> containers, ArrayList<String> accessors, ArrayList<String> managers) {
         //loop through all the entries in the hash map
-        for (Map.Entry<String, ClaimPermission> entry : this.playerIDToClaimPermissionMap.entrySet())
-        {
+        for (Map.Entry<String, ClaimPermission> entry : this.playerIDToClaimPermissionMap.entrySet()) {
             //build up a list for each permission level
-            if (entry.getValue() == ClaimPermission.Build)
-            {
+            if (entry.getValue() == ClaimPermission.Build) {
                 builders.add(entry.getKey());
-            }
-            else if (entry.getValue() == ClaimPermission.Inventory)
-            {
+            } else if (entry.getValue() == ClaimPermission.Inventory) {
                 containers.add(entry.getKey());
-            }
-            else
-            {
+            } else {
                 accessors.add(entry.getKey());
             }
         }
@@ -472,21 +424,18 @@ public class Claim
     }
 
     //returns a copy of the location representing lower x, y, z limits
-    public Location getLesserBoundaryCorner()
-    {
+    public Location getLesserBoundaryCorner() {
         return this.lesserBoundaryCorner.clone();
     }
 
     //returns a copy of the location representing upper x, y, z limits
     //NOTE: remember upper Y will always be ignored, all claims always extend to the sky
-    public Location getGreaterBoundaryCorner()
-    {
+    public Location getGreaterBoundaryCorner() {
         return this.greaterBoundaryCorner.clone();
     }
 
     //returns a friendly owner name (for admin claims, returns "an administrator" as the owner)
-    public String getOwnerName()
-    {
+    public String getOwnerName() {
         if (this.parent != null)
             return this.parent.getOwnerName();
 
@@ -496,10 +445,8 @@ public class Claim
         return GriefPrevention.lookupPlayerName(this.ownerID);
     }
 
-    public UUID getOwnerID()
-    {
-        if (this.parent != null)
-        {
+    public UUID getOwnerID() {
+        if (this.parent != null) {
             return this.parent.ownerID;
         }
         return this.ownerID;
@@ -508,8 +455,7 @@ public class Claim
     //whether or not a location is in a claim
     //ignoreHeight = true means location UNDER the claim will return TRUE
     //excludeSubdivisions = true means that locations inside subdivisions of the claim will return FALSE
-    public boolean contains(Location location, boolean ignoreHeight, boolean excludeSubdivisions)
-    {
+    public boolean contains(Location location, boolean ignoreHeight, boolean excludeSubdivisions) {
         //not in the same world implies false
         if (!Objects.equals(location.getWorld(), this.lesserBoundaryCorner.getWorld())) return false;
 
@@ -518,13 +464,11 @@ public class Claim
         int z = location.getBlockZ();
 
         // If we're ignoring height, use 2D containment check.
-        if (ignoreHeight && !boundingBox.contains2d(x, z))
-        {
+        if (ignoreHeight && !boundingBox.contains2d(x, z)) {
             return false;
         }
         // Otherwise use full containment check.
-        else if (!ignoreHeight && !boundingBox.contains(x, location.getBlockY(), z))
-        {
+        else if (!ignoreHeight && !boundingBox.contains(x, location.getBlockY(), z)) {
             return false;
         }
 
@@ -532,20 +476,16 @@ public class Claim
         //you're only in a subdivision when you're also in its parent claim
         //NOTE: if a player creates subdivions then resizes the parent claim, it's possible that
         //a subdivision can reach outside of its parent's boundaries.  so this check is important!
-        if (this.parent != null)
-        {
+        if (this.parent != null) {
             return this.parent.contains(location, ignoreHeight, false);
         }
 
         //code to exclude subdivisions in this check
-        else if (excludeSubdivisions)
-        {
+        else if (excludeSubdivisions) {
             //search all subdivisions to see if the location is in any of them
-            for (Claim child : this.children)
-            {
+            for (Claim child : this.children) {
                 //if we find such a subdivision, return false
-                if (child.contains(location, ignoreHeight, true))
-                {
+                if (child.contains(location, ignoreHeight, true)) {
                     return false;
                 }
             }
@@ -557,16 +497,15 @@ public class Claim
 
     //whether or not two claims overlap
     //used internally to prevent overlaps when creating claims
-    public boolean overlaps(Claim otherClaim)
-    {
-        if (!Objects.equals(this.lesserBoundaryCorner.getWorld(), otherClaim.getLesserBoundaryCorner().getWorld())) return false;
+    public boolean overlaps(Claim otherClaim) {
+        if (!Objects.equals(this.lesserBoundaryCorner.getWorld(), otherClaim.getLesserBoundaryCorner().getWorld()))
+            return false;
 
         return new BoundingBox(this).intersects(new BoundingBox(otherClaim));
     }
 
     //whether more entities may be added to a claim
-    public String allowMoreEntities(boolean remove)
-    {
+    public String allowMoreEntities(boolean remove) {
         if (this.parent != null) return this.parent.allowMoreEntities(remove);
 
         //this rule only applies to creative mode worlds
@@ -585,13 +524,10 @@ public class Claim
         //count current entities (ignoring players)
         int totalEntities = 0;
         ArrayList<Chunk> chunks = this.getChunks();
-        for (Chunk chunk : chunks)
-        {
+        for (Chunk chunk : chunks) {
             Entity[] entities = chunk.getEntities();
-            for (Entity entity : entities)
-            {
-                if (!(entity instanceof Player) && this.contains(entity.getLocation(), false, false))
-                {
+            for (Entity entity : entities) {
+                if (!(entity instanceof Player) && this.contains(entity.getLocation(), false, false)) {
                     totalEntities++;
                     if (remove && totalEntities > maxEntities) entity.remove();
                 }
@@ -604,8 +540,7 @@ public class Claim
         return null;
     }
 
-    public String allowMoreActiveBlocks()
-    {
+    public String allowMoreActiveBlocks() {
         if (this.parent != null) return this.parent.allowMoreActiveBlocks();
 
         //determine maximum allowable entity count, based on claim size
@@ -616,15 +551,11 @@ public class Claim
         //count current actives
         int totalActives = 0;
         ArrayList<Chunk> chunks = this.getChunks();
-        for (Chunk chunk : chunks)
-        {
+        for (Chunk chunk : chunks) {
             BlockState[] actives = chunk.getTileEntities();
-            for (BlockState active : actives)
-            {
-                if (BlockEventHandler.isActiveBlock(active))
-                {
-                    if (this.contains(active.getLocation(), false, false))
-                    {
+            for (BlockState active : actives) {
+                if (BlockEventHandler.isActiveBlock(active)) {
+                    if (this.contains(active.getLocation(), false, false)) {
                         totalActives++;
                     }
                 }
@@ -638,8 +569,7 @@ public class Claim
     }
 
     //implements a strict ordering of claims, used to keep the claims collection sorted for faster searching
-    boolean greaterThan(Claim otherClaim)
-    {
+    boolean greaterThan(Claim otherClaim) {
         Location thisCorner = this.getLesserBoundaryCorner();
         Location otherCorner = otherClaim.getLesserBoundaryCorner();
 
@@ -654,9 +584,7 @@ public class Claim
         return thisCorner.getWorld().getName().compareTo(otherCorner.getWorld().getName()) < 0;
     }
 
-
-    long getPlayerInvestmentScore()
-    {
+    long getPlayerInvestmentScore() {
         //decide which blocks will be considered player placed
         Location lesserBoundaryCorner = this.getLesserBoundaryCorner();
         Set<Material> playerBlocks = RestoreNatureProcessingTask.getPlayerBlocks(lesserBoundaryCorner.getWorld().getEnvironment(), lesserBoundaryCorner.getBlock().getBiome());
@@ -666,42 +594,28 @@ public class Claim
 
         boolean creativeMode = ConfigLoader.creativeRulesApply(lesserBoundaryCorner);
 
-        for (int x = this.lesserBoundaryCorner.getBlockX(); x <= this.greaterBoundaryCorner.getBlockX(); x++)
-        {
-            for (int z = this.lesserBoundaryCorner.getBlockZ(); z <= this.greaterBoundaryCorner.getBlockZ(); z++)
-            {
+        for (int x = this.lesserBoundaryCorner.getBlockX(); x <= this.greaterBoundaryCorner.getBlockX(); x++) {
+            for (int z = this.lesserBoundaryCorner.getBlockZ(); z <= this.greaterBoundaryCorner.getBlockZ(); z++) {
                 int y = this.lesserBoundaryCorner.getBlockY();
-                for (; y < GriefPrevention.instance.getSeaLevel(this.lesserBoundaryCorner.getWorld()) - 5; y++)
-                {
+                for (; y < GriefPrevention.instance.getSeaLevel(this.lesserBoundaryCorner.getWorld()) - 5; y++) {
                     Block block = this.lesserBoundaryCorner.getWorld().getBlockAt(x, y, z);
-                    if (playerBlocks.contains(block.getType()))
-                    {
-                        if (block.getType() == Material.CHEST && !creativeMode)
-                        {
+                    if (playerBlocks.contains(block.getType())) {
+                        if (block.getType() == Material.CHEST && !creativeMode) {
                             score += 10;
-                        }
-                        else
-                        {
+                        } else {
                             score += .5;
                         }
                     }
                 }
 
-                for (; y < this.lesserBoundaryCorner.getWorld().getMaxHeight(); y++)
-                {
+                for (; y < this.lesserBoundaryCorner.getWorld().getMaxHeight(); y++) {
                     Block block = this.lesserBoundaryCorner.getWorld().getBlockAt(x, y, z);
-                    if (playerBlocks.contains(block.getType()))
-                    {
-                        if (block.getType() == Material.CHEST && !creativeMode)
-                        {
+                    if (playerBlocks.contains(block.getType())) {
+                        if (block.getType() == Material.CHEST && !creativeMode) {
                             score += 10;
-                        }
-                        else if (creativeMode && (block.getType() == Material.LAVA))
-                        {
+                        } else if (creativeMode && (block.getType() == Material.LAVA)) {
                             score -= 10;
-                        }
-                        else
-                        {
+                        } else {
                             score += 1;
                         }
                     }
@@ -712,23 +626,26 @@ public class Claim
         return (long) score;
     }
 
-    public ArrayList<Chunk> getChunks()
-    {
+    public ArrayList<Chunk> getChunks() {
         ArrayList<Chunk> chunks = new ArrayList<>();
 
         World world = this.getLesserBoundaryCorner().getWorld();
         Chunk lesserChunk = this.getLesserBoundaryCorner().getChunk();
         Chunk greaterChunk = this.getGreaterBoundaryCorner().getChunk();
 
-        for (int x = lesserChunk.getX(); x <= greaterChunk.getX(); x++)
-        {
-            for (int z = lesserChunk.getZ(); z <= greaterChunk.getZ(); z++)
-            {
+        for (int x = lesserChunk.getX(); x <= greaterChunk.getX(); x++) {
+            for (int z = lesserChunk.getZ(); z <= greaterChunk.getZ(); z++) {
                 chunks.add(world.getChunkAt(x, z));
             }
         }
 
         return chunks;
+    }
+
+    @Deprecated
+    public @Nullable String allowAccess(@NotNull Player player) {
+        Supplier<String> supplier = GriefPrevention.get().getIocContainer().get(ClaimService.class).checkPermission(this, player, ClaimPermission.Access, null);
+        return supplier != null ? supplier.get() : null;
     }
 
     public HashMap<String, ClaimPermission> getPlayerIDToClaimPermissionMap() {
@@ -739,8 +656,7 @@ public class Claim
         return inheritNothing;
     }
 
-    public ArrayList<Long> getChunkHashes()
-    {
+    public ArrayList<Long> getChunkHashes() {
         return HelperUtil.getChunkHashes(this);
     }
 }
