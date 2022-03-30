@@ -16,7 +16,6 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("buyclaimblocks")
 public class BuyClaimBlocksCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

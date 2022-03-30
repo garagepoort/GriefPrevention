@@ -8,7 +8,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-@IocBean
 @IocCommandHandler("gpblockinfo")
 public class GpBlockInfoCmd extends AbstractCmd {
 

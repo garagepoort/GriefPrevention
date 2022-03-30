@@ -13,7 +13,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("separate")
 public class SeparateCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

@@ -32,7 +32,6 @@ import java.util.Objects;
 
 import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 
-@IocBean
 @IocCommandHandler("claim")
 public class ClaimCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

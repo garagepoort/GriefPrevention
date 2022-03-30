@@ -21,7 +21,6 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("trapped")
 public class TrappedCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

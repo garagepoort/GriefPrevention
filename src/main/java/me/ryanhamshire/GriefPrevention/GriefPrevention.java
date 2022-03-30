@@ -19,7 +19,6 @@
 package me.ryanhamshire.GriefPrevention;
 
 import be.garagepoort.mcioc.TubingPlugin;
-import be.garagepoort.mcioc.configuration.files.ConfigurationFile;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.BanList;
@@ -37,8 +36,6 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -109,11 +106,6 @@ public class GriefPrevention extends TubingPlugin {
     public void enable() {
         AddLogEntry("Boot finished.");
         this.dataStore = getIocContainer().get(DataStore.class);
-    }
-
-    @Override
-    public List<ConfigurationFile> getConfigurationFiles() {
-        return Collections.emptyList();
     }
 
     public enum IgnoreMode {None, StandardIgnore, AdminIgnore}

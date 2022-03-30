@@ -16,7 +16,6 @@ import org.bukkit.command.CommandSender;
 
 import java.util.UUID;
 
-@IocBean
 @IocCommandHandler("adjustbonusclaimblocks")
 public class AdjustBonusClaimsCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

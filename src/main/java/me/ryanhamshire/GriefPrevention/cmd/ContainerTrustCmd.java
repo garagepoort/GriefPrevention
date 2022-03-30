@@ -8,7 +8,6 @@ import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("containertrust")
 public class ContainerTrustCmd extends AbstractCmd {
     private final TrustService trustService;

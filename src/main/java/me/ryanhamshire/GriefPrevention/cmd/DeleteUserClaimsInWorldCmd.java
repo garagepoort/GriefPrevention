@@ -14,7 +14,6 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("deleteuserclaimsinworld")
 public class DeleteUserClaimsInWorldCmd extends AbstractCmd {
     private final BukkitUtils bukkitUtils;

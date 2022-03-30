@@ -15,7 +15,6 @@ import java.util.Vector;
 
 import static me.ryanhamshire.GriefPrevention.GriefPrevention.getfriendlyLocationString;
 
-@IocBean
 @IocCommandHandler("adminclaimslist")
 public class AdminClaimsListCmd extends AbstractCmd {
     private final BukkitUtils bukkitUtils;

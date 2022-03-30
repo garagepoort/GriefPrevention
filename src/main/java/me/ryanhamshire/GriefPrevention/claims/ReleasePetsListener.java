@@ -1,6 +1,5 @@
 package me.ryanhamshire.GriefPrevention.claims;
 
-import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.events.ClaimDeletedEvent;
@@ -15,7 +14,6 @@ import org.bukkit.inventory.InventoryHolder;
 import java.util.Arrays;
 import java.util.UUID;
 
-@IocBean
 @IocListener
 public class ReleasePetsListener implements Listener {
 

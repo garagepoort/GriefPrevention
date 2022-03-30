@@ -12,7 +12,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("unlockdrops")
 public class UnlockDropsCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

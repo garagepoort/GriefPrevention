@@ -11,7 +11,6 @@ import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("ignoreclaims")
 public class IgnoreClaimsCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

@@ -15,7 +15,6 @@ import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("deletealladminclaims")
 public class DeleteAllAdminClaimsCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

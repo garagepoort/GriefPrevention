@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-@IocBean
 @IocCommandHandler("trustlist")
 public class TrustListCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

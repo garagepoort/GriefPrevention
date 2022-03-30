@@ -9,7 +9,6 @@ import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("gpreload")
 public class GpReloadCmd extends AbstractCmd {
 

@@ -15,7 +15,6 @@ import org.bukkit.entity.Player;
 import java.util.Map;
 import java.util.UUID;
 
-@IocBean
 @IocCommandHandler("ignoredplayerlist")
 public class IgnoredPlayerListCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

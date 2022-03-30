@@ -13,7 +13,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("givepet")
 public class GivePetCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

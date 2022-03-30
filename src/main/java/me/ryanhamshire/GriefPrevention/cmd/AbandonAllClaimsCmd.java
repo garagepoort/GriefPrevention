@@ -1,12 +1,11 @@
 package me.ryanhamshire.GriefPrevention.cmd;
 
-import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.TextMode;
 import me.ryanhamshire.GriefPrevention.Visualization;
 import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
@@ -18,7 +17,6 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 
-@IocBean
 @IocCommandHandler("abandonallclaims")
 public class AbandonAllClaimsCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

@@ -13,7 +13,6 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 /**
  * Listener for events which may result in a change in the active Economy.
  */
-@IocBean
 @IocListener
 public class EconomyHandler implements Listener
 {

@@ -19,7 +19,6 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 
-@IocBean
 @IocCommandHandler("claimslist")
 public class ClaimsListCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

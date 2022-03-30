@@ -128,7 +128,7 @@
                                     </excludes>
                                 </filter>
                                 <filter>
-                                    <artifact>be.garagepoort.mcioc:tubing</artifact>
+                                    <artifact>be.garagepoort.mcioc:*</artifact>
                                     <includes>
                                         <include>**</include>
                                     </includes>
@@ -199,7 +199,7 @@
         <dependency>
             <groupId>be.garagepoort.mcioc</groupId>
             <artifactId>tubing</artifactId>
-            <version>5.0.1</version>
+            <version>6.0.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>*</groupId>

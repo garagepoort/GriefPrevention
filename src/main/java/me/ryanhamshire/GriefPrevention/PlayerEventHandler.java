@@ -18,7 +18,6 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.claims.ClaimBlockService;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
@@ -107,7 +106,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
-@IocBean
 @IocListener
 public class PlayerEventHandler implements Listener {
     private final PlayerDataRepository playerDataRepository;

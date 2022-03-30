@@ -86,7 +86,6 @@ import java.util.function.Supplier;
 
 import static me.ryanhamshire.GriefPrevention.MessageService.sendMessage;
 
-@IocBean
 @IocListener
 public class BlockEventHandler implements Listener {
     private final PlayerDataRepository playerDataRepository;

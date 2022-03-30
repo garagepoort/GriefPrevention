@@ -19,7 +19,6 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("siege")
 public class SiegeCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

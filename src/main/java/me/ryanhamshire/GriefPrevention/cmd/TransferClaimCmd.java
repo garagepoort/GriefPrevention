@@ -18,7 +18,6 @@ import org.bukkit.entity.Player;
 
 import java.util.UUID;
 
-@IocBean
 @IocCommandHandler("transferclaim")
 public class TransferClaimCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

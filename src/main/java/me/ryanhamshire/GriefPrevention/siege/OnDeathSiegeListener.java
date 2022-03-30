@@ -15,7 +15,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 
-@IocBean
 @IocListener
 public class OnDeathSiegeListener implements Listener {
     private final PlayerDataRepository playerDataRepository;

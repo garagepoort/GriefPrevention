@@ -13,7 +13,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
-@IocBean
 @IocListener
 public class SiegeEventHandler implements Listener
 {

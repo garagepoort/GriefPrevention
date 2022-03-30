@@ -20,7 +20,6 @@ import org.bukkit.entity.Player;
 
 import java.util.function.Supplier;
 
-@IocBean
 @IocCommandHandler("extendclaim")
 public class ExtendClaimCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

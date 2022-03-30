@@ -1,15 +1,14 @@
 package me.ryanhamshire.GriefPrevention.listeners;
 
-import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.ClaimsMode;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
-import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.IgnoreLoaderThread;
 import me.ryanhamshire.GriefPrevention.MessageService;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
+import me.ryanhamshire.GriefPrevention.PlayerDataRepository;
 import me.ryanhamshire.GriefPrevention.PlayerKickBanTask;
 import me.ryanhamshire.GriefPrevention.PvpProtectionService;
 import me.ryanhamshire.GriefPrevention.TextMode;
@@ -34,7 +33,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.UUID;
 
-@IocBean
 @IocListener
 public class OnPlayerJoin implements Listener {
 

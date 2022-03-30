@@ -13,7 +13,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("ignoreplayer")
 public class IgnorePlayerCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

@@ -7,7 +7,6 @@ import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("abandonclaim")
 public class AbandonClaimCmd extends AbstractCmd {
     private final BukkitUtils bukkitUtils;

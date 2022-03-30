@@ -13,7 +13,6 @@ import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("restrictsubclaim")
 public class RestrictSubclaimCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

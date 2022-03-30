@@ -7,7 +7,6 @@ import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("permissiontrust")
 public class PermissionTrustCmd extends AbstractCmd {
     private final TrustService trustService;

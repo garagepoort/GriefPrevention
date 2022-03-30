@@ -15,7 +15,6 @@ import org.bukkit.entity.Player;
 
 import java.util.function.Supplier;
 
-@IocBean
 @IocCommandHandler("claimexplosions")
 public class ClaimExplosionsCmd extends AbstractCmd {
     private final PlayerDataRepository playerDataRepository;

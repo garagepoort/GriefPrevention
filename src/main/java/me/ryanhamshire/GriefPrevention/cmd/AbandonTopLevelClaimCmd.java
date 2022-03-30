@@ -1,13 +1,11 @@
 package me.ryanhamshire.GriefPrevention.cmd;
 
-import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocCommandHandler;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.util.BukkitUtils;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@IocBean
 @IocCommandHandler("gpreload")
 public class AbandonTopLevelClaimCmd extends AbstractCmd {
     private final BukkitUtils bukkitUtils;

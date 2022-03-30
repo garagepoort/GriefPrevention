@@ -25,7 +25,6 @@ import org.bukkit.inventory.ItemStack;
 import java.util.List;
 import java.util.UUID;
 
-@IocBean
 @IocListener
 public class OnDeath implements Listener {
     private final PlayerDataRepository playerDataRepository;
