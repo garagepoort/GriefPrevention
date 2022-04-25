@@ -19,6 +19,7 @@
 package me.ryanhamshire.GriefPrevention;
 
 import com.google.common.io.Files;
+import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
@@ -214,7 +215,11 @@ public abstract class PlayerDataRepository {
         if (this.playerNameToPlayerDataMap.containsKey(playerID)) {
             return playerNameToPlayerDataMap.get(playerID);
         }
-        PlayerData playerData = getPlayerDataFromStorage(playerID).orElseGet(() -> new PlayerData(playerID));
+        PlayerData playerData = getPlayerDataFromStorage(playerID).orElseGet(() -> {
+            PlayerData newPlayerData = new PlayerData(playerID);
+            newPlayerData.setAccruedClaimBlocks(ConfigLoader.config_claims_initialBlocks);
+            return newPlayerData;
+        });
         this.playerNameToPlayerDataMap.put(playerID, playerData);
         return playerData;
     }

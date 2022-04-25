@@ -5,7 +5,7 @@
 
     <groupId>com.github.TechFortress</groupId>
     <artifactId>GriefPrevention</artifactId>
-    <version>16.18-RC2-SNAPSHOT</version>
+    <version>16.18-RC3-SNAPSHOT</version>
 
     <name>GriefPrevention</name>
     <description>The official self-service anti-griefing Bukkit plugin for Minecraft servers since 2011.</description>
@@ -199,7 +199,7 @@
         <dependency>
             <groupId>be.garagepoort.mcioc</groupId>
             <artifactId>tubing</artifactId>
-            <version>6.0.0</version>
+            <version>6.0.3</version>
             <exclusions>
                 <exclusion>
                     <groupId>*</groupId>

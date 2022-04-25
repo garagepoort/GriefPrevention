@@ -51,9 +51,6 @@ public class GriefPrevention extends TubingPlugin {
     //this handles data storage, like player and region data
     public DataStore dataStore;
 
-    // Event handlers with common functionality
-    EntityEventHandler entityEventHandler;
-
     //this tracks item stacks expected to drop which will need protection
     public ArrayList<PendingItemProtection> pendingItemWatchList = new ArrayList<>();
 

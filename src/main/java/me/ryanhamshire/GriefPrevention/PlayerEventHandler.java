@@ -125,8 +125,9 @@ public class PlayerEventHandler implements Listener {
     private final SessionManager sessionManager;
     private final NotificationService notificationService;
     private final LogoutMessagesService logoutMessagesService;
+    private final EntityEventHandler entityEventHandler;
 
-    public PlayerEventHandler(PlayerDataRepository playerDataRepository, PvpProtectionService pvpProtectionService, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, DataStore dataStore, SessionManager sessionManager, NotificationService notificationService, LogoutMessagesService logoutMessagesService) {
+    public PlayerEventHandler(PlayerDataRepository playerDataRepository, PvpProtectionService pvpProtectionService, BukkitUtils bukkitUtils, ClaimService claimService, ClaimBlockService claimBlockService, ResizeClaimService resizeClaimService, DataStore dataStore, SessionManager sessionManager, NotificationService notificationService, LogoutMessagesService logoutMessagesService, EntityEventHandler entityEventHandler) {
         this.playerDataRepository = playerDataRepository;
         bannedWordFinder = new WordFinder(playerDataRepository.loadBannedWords());
         this.pvpProtectionService = pvpProtectionService;
@@ -139,6 +140,7 @@ public class PlayerEventHandler implements Listener {
         this.sessionManager = sessionManager;
         this.notificationService = notificationService;
         this.logoutMessagesService = logoutMessagesService;
+        this.entityEventHandler = entityEventHandler;
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
@@ -947,7 +949,7 @@ public class PlayerEventHandler implements Listener {
         // Name tags may only be used on entities that the player is allowed to kill.
         if (itemInHand.getType() == Material.NAME_TAG) {
             EntityDamageByEntityEvent damageEvent = new EntityDamageByEntityEvent(player, entity, EntityDamageEvent.DamageCause.CUSTOM, 0);
-            GriefPrevention.get().entityEventHandler.onEntityDamage(damageEvent);
+            entityEventHandler.onEntityDamage(damageEvent);
             if (damageEvent.isCancelled()) {
                 event.setCancelled(true);
                 // Don't print message - damage event handler should have handled it.

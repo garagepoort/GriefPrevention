@@ -18,7 +18,6 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import be.garagepoort.mcioc.IocBean;
 import be.garagepoort.mcioc.IocListener;
 import me.ryanhamshire.GriefPrevention.claims.ClaimService;
 import me.ryanhamshire.GriefPrevention.config.ConfigLoader;
@@ -113,17 +112,11 @@ public class EntityEventHandler implements Listener
     private final PlayerDataRepository playerDataRepository;
     private final NamespacedKey luredByPlayer;
     private final ClaimService claimService;
-    private final SiegeService siegeService;
-    private final BukkitUtils bukkitUtils;
-    private final DataStore dataStore;
 
     public EntityEventHandler(PlayerDataRepository playerDataRepository, ClaimService claimService, SiegeService siegeService, BukkitUtils bukkitUtils, DataStore dataStore)
     {
         this.playerDataRepository = playerDataRepository;
         this.claimService = claimService;
-        this.siegeService = siegeService;
-        this.bukkitUtils = bukkitUtils;
-        this.dataStore = dataStore;
 
         luredByPlayer = new NamespacedKey(GriefPrevention.get(), "lured_by_player");
     }
